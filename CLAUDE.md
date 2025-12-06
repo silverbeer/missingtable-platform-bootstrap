@@ -40,3 +40,30 @@
   - `tofu destroy` - Tear down (practice this!)
   - `tofu fmt` - Format code
   - `tofu validate` - Check syntax
+
+
+  ## Belt Progression
+
+  | Belt | Milestone | Status |
+  |------|-----------|--------|
+  | ⬜ White | Project setup complete | ✅ ACHIEVED |
+  | 🟡 Yellow | First `tofu apply` (local) | |
+  | 🟠 Orange | First cloud resource deployed | |
+  | 🟢 Green | Working VPC module | |
+  | 🔵 Blue | Running EKS cluster | |
+  | 🟤 Brown | Multi-cloud (AWS + GCP) | |
+  | ⚫ Black | All 4 clouds + CI/CD | |
+
+  ### Current Belt: ⬜ White
+  **Earned**: Phase 0.2 complete - project foundation established
+
+  ---
+  Also update the "Current Progress" section from:
+  ### Current Progress
+  Phase: 0 - Foundation Setup
+  Step: 0.1 - Creating CLAUDE.md (this file!)
+
+  To:
+  ### Current Progress
+  Phase: 0 - Foundation Setup
+  Step: 0.3 - OpenTofu Hello World (next up!)

@@ -1,0 +1,26 @@
+  # OpenTofu / Terraform (state files use same naming)
+  .terraform/
+  .tofu/
+  *.tfstate
+  *.tfstate.*
+  *.tfvars
+  !*.tfvars.example
+  .terraform.lock.hcl
+  crash.log
+  override.tf
+  override.tf.json
+  *_override.tf
+  *_override.tf.json
+
+  # IDE
+  .idea/
+  .vscode/
+  *.swp
+
+  # OS
+  .DS_Store
+
+  # Secrets (never commit!)
+  *.pem
+  *.key
+  secrets/

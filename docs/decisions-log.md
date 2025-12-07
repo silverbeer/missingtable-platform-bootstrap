@@ -38,7 +38,9 @@ Quick notes captured during OpenTofu ninja training. Will be formalized later.
 ### Folder Structure
 ```
 modules/
-└── aws/vpc/          # Reusable building blocks
+└── aws/
+    ├── vpc/          # VPC, subnets, IGW, NAT, route tables
+    └── eks/          # EKS cluster, node groups, IAM roles
 
 clouds/
 └── aws/environments/
@@ -55,12 +57,36 @@ clouds/
 
 | Resource | Cost | Notes |
 |----------|------|-------|
-| NAT Gateway | ~$32/month | No free tier. ALWAYS destroy when not in use. |
 | VPC | Free | No charge for VPC itself |
+| NAT Gateway | ~$32/month | No free tier. ALWAYS destroy when not in use. |
+| EKS Cluster | ~$72/month | Control plane - $0.10/hour |
+| t3.medium | ~$30/month each | Worker nodes - $0.04/hour |
 
 ---
 
 ## Tips & Gotchas
 
-- `tofu destroy` freely while learning - saves money when EKS comes
+- `tofu destroy` freely while learning - saves money
 - VPCs are free, NAT Gateways are not
+- `values()` converts a map to a list - needed when passing subnet IDs to EKS
+- Variables with no defaults = required inputs (safety feature)
+- EKS needs IAM roles for both cluster AND nodes (separate trust policies)
+
+## AWS CLI Commands
+
+```bash
+# VPC info
+aws ec2 describe-vpcs --filters "Name=tag:Name,Values=missing-table-vpc" --output table
+
+# Subnets in a VPC
+aws ec2 describe-subnets --filters "Name=vpc-id,Values=VPC_ID" --query 'Subnets[*].[SubnetId,CidrBlock,AvailabilityZone,MapPublicIpOnLaunch,Tags[?Key==`Name`].Value|[0]]' --output table
+
+# Internet Gateway
+aws ec2 describe-internet-gateways --filters "Name=attachment.vpc-id,Values=VPC_ID" --output table
+
+# EKS clusters
+aws eks list-clusters
+
+# EKS cluster details
+aws eks describe-cluster --name CLUSTER_NAME
+```

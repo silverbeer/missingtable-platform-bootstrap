@@ -18,3 +18,12 @@ module "vpc" {
   vpc_availability_zones = ["us-east-2a", "us-east-2b"]
   environment = "dev"
 }
+
+module "eks" {
+  source = "../../../../modules/aws/eks"
+  cluster_name = "missing-table-eks-cluster-dev"
+  cluster_version = "1.31"
+  vpc_id = module.vpc.vpc_id
+  public_subnet_ids = values(module.vpc.public_subnet_ids)
+  private_subnet_ids = values(module.vpc.private_subnet_ids)
+}

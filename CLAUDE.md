@@ -46,16 +46,63 @@ ONE STEP AT A TIME. Never write multiple modules. Never skip ahead.
 | ⬜ White | Project setup complete | ✅ ACHIEVED |
 | 🟡 Yellow | First `tofu apply` (local) | ✅ ACHIEVED |
 | 🟠 Orange | First cloud resource deployed | ✅ ACHIEVED |
-| 🟢 Green | Working VPC module | |
+| 🟢 Green | Working VPC module | ✅ ACHIEVED |
 | 🔵 Blue | Running EKS cluster | |
 | 🟤 Brown | Multi-cloud (AWS + GCP) | |
 | ⚫ Black | All 4 clouds + CI/CD | |
 
-### Current Belt: 🟠 Orange
-**Earned**: Deployed first AWS resource (S3 bucket) with full init/plan/apply/destroy cycle
+### Current Belt: 🟢 Green
+**Earned**: Complete VPC module with public/private subnets, IGW, NAT Gateway, route tables across 2 AZs
 
 ---
 
 ## Current Progress
 Phase: 1 - AWS Foundation
-Step: 1.0 - Ready for VPC module (Green Belt challenge!)
+Step: 1.2 - EKS module next
+
+### Completed:
+- ✅ VPC module with public/private subnets (2 AZs)
+- ✅ Internet Gateway + public route table
+- ✅ NAT Gateway + private route table
+- ✅ `for_each` for multi-AZ subnet creation
+- ✅ Full destroy cycle (no resources left burning)
+
+### Next Session - Blue Belt:
+1. Create EKS module structure
+2. IAM roles for EKS cluster and nodes
+3. EKS cluster resource
+4. Node group in private subnets
+5. `kubectl` access configuration
+
+### Key Learnings:
+- `for_each` with maps for multi-resource creation
+- `each.key` and `each.value` for accessing map data
+- Public subnets: `map_public_ip_on_launch = true` + route to IGW
+- Private subnets: route to NAT Gateway for outbound
+- NAT Gateways cost ~$32/month - always destroy when not in use
+- AWS CLI with `--query` and `--output table` for verification
+
+---
+
+## Documentation Discipline
+
+### Docs Structure
+- `docs/README.md` - Index of all documentation
+- `docs/decisions-log.md` - Quick notes during learning (raw, informal)
+- `docs/architecture/` - How things work (graduate stable concepts here)
+- `docs/guides/` - How to do things (getting-started, workflows)
+- `docs/runbooks/` - Operational procedures (cost management, troubleshooting)
+
+### When to Document
+| Trigger | Action |
+|---------|--------|
+| Learn something new | Add to decisions-log.md |
+| Earn a new belt | Update architecture/overview.md |
+| Add new prereq/tool | Update guides/getting-started.md |
+| Discover cost gotcha | Add to runbooks/cost-management.md |
+| Pattern becomes stable | Graduate from decisions-log → appropriate doc |
+
+### Coach Reminders
+- After `tofu apply`: "What did you learn? Add it to decisions-log.md"
+- After earning a belt: "Let's update the architecture doc"
+- Don't let docs/decisions-log.md get stale - review and graduate content periodically

@@ -1,19 +1,66 @@
-What variables and outputs are for?
-    Variables makes the resources resuable.  Otherwise they need to be hardcoded.  Adding a sensible to the variable makes sense.
+# Decisions & Learning Log
 
-    Outputs provide important details or outputs from executing the resource.   For example if you create an ec2 instance you will be able to output key information about the newly created ec2 resource like instance ID or ip address
+Quick notes captured during OpenTofu ninja training. Will be formalized later.
 
-The plan vs apply distinction?
+---
 
-    plan is the dry run
-    apply is the real run, changes will be made
+## Concepts
 
-    It's best practice to always run plan ahead of apply.  This should be forced or built into any tofu pipelines we create
+### Variables & Outputs
+- **Variables**: Make resources reusable (avoid hardcoding). Always add sensible defaults.
+  - Using type of map(string) for subnet CIDR block makes sense as you need to have nodes running in multiple AZ with EKS
+- **Outputs**: Expose key info from resources (e.g., instance ID, IP address after EC2 creation).
 
-What you learned about providers, init, the lock file
+### Plan vs Apply
+- `plan` = dry run (preview changes)
+- `apply` = real run (makes changes)
+- **Best practice**: Always run plan before apply. Enforce this in pipelines.
 
-    providers have versions.  This syntax will deploy the latest stable version - version = "~> 5.0".  There is a tofu lock file that gets commited that will track the exact version deployed.  Other uses of the repo will be locked to this version due to the lock file. 
+### Providers & Init
+- Providers have versions. `~> 5.0` = latest stable 5.x
+- Lock file tracks exact version deployed (commit this!)
+- AWS provider is large - first `tofu init` takes time
 
-    AWS provider is big.  initial tofu init will take some time
+### Modules
+- Modules don't need `terraform {}` or `provider {}` blocks - they inherit from caller
+- Source paths are relative: `../../../../modules/aws/vpc` from dev environment
+- Module outputs must be re-exposed in environment outputs.tf to see them
+- `for_each` to create multiple resources from a map
+  - `each.key` = the map key (e.g., AZ name)
+  - `each.value` = the map value (e.g., CIDR block)
+  - Prefer `for_each` over `count` - deleting an item doesn't shift indexes
+  - Outputs become maps too: `{ for k, v in aws_subnet.public : k => v.id }`
 
-tofu destroy is good to use while learning to be a ninja.  Good practice - this will safe us money down the road when we start spinning up EKS.
+---
+
+## Patterns & Conventions
+
+### Folder Structure
+```
+modules/
+└── aws/vpc/          # Reusable building blocks
+
+clouds/
+└── aws/environments/
+    ├── dev/          # Calls modules with env-specific config
+    ├── staging/
+    └── prod/
+```
+**Why**: Modules are reusable. Environments call modules with different variables.
+**Later**: Add gcp/, azure/, digitalocean/ under both.
+
+---
+
+## Cost Warnings
+
+| Resource | Cost | Notes |
+|----------|------|-------|
+| NAT Gateway | ~$32/month | No free tier. ALWAYS destroy when not in use. |
+| VPC | Free | No charge for VPC itself |
+
+---
+
+## Tips & Gotchas
+
+- `tofu destroy` freely while learning - saves money when EKS comes
+- VPCs are free, NAT Gateways are not

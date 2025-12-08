@@ -72,8 +72,10 @@ Step: 2.1 - DOKS + GHCR
 ### Next Session - Brown Belt:
 1. Push missing-table images to GHCR (cloud-agnostic registry)
 2. Create DOKS module (DigitalOcean Kubernetes)
-3. Deploy missing-table to DOKS
-4. Compare cost/complexity: EKS vs DOKS
+3. Deploy missing-table + qualityplaybook.dev to DOKS
+4. Shared nginx-ingress for both apps (one LB, path-based routing)
+5. Compare cost: GKE $50/mo → DOKS ~$36/mo (both apps)
+6. Blog about the journey on qualityplaybook.dev
 
 ### Key Learnings:
 - `for_each` with maps for multi-resource creation

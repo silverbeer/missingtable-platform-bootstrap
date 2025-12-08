@@ -4,6 +4,223 @@ Quick notes captured during OpenTofu ninja training. Will be formalized later.
 
 ---
 
+## DigitalOcean (Blue Belt → Brown Belt)
+
+### DOKS vs EKS - Simplicity Wins
+
+| Component | EKS (AWS) | DOKS (DigitalOcean) |
+|-----------|-----------|---------------------|
+| VPC | You build it | DO provides it |
+| Subnets | You build them | DO handles it |
+| IAM Roles | 2 roles needed | None |
+| NAT Gateway | $32/month extra | Included |
+| Control Plane | $73/month | **Free** |
+| Total Setup | ~15 resources | **1 resource** |
+| Deploy Time | 15-20 min | 5 min |
+| Monthly Cost | ~$164 | ~$48 |
+
+**Key Learning**: Same K8s primitives, fraction of the complexity. Great for learning, great for cost-conscious projects.
+
+### DOKS Cluster - Single Resource
+
+```hcl
+resource "digitalocean_kubernetes_cluster" "main" {
+  name    = "missingtable-dev"
+  region  = "nyc1"
+  version = "1.32.10-do.1"
+
+  node_pool {
+    name       = "default-pool"
+    size       = "s-2vcpu-4gb"  # Human-readable sizing!
+    node_count = 2
+  }
+}
+```
+
+**Node sizing**: `s-2vcpu-4gb` is beautifully readable vs AWS's `t3.medium`.
+
+### Kubernetes Provider for DOKS
+
+```hcl
+provider "kubernetes" {
+  host  = digitalocean_kubernetes_cluster.main.endpoint
+  token = digitalocean_kubernetes_cluster.main.kube_config[0].token
+  cluster_ca_certificate = base64decode(
+    digitalocean_kubernetes_cluster.main.kube_config[0].cluster_ca_certificate
+  )
+}
+```
+
+Simpler than EKS - no IAM exec plugin needed, just token auth.
+
+### Helm Provider for Ingress + cert-manager
+
+```hcl
+provider "helm" {
+  kubernetes {
+    host  = digitalocean_kubernetes_cluster.main.endpoint
+    token = digitalocean_kubernetes_cluster.main.kube_config[0].token
+    cluster_ca_certificate = base64decode(
+      digitalocean_kubernetes_cluster.main.kube_config[0].cluster_ca_certificate
+    )
+  }
+}
+```
+
+Used for:
+- `ingress-nginx` controller (single LoadBalancer for all apps)
+- `cert-manager` (auto TLS via Let's Encrypt)
+
+### GHCR Private Images - imagePullSecrets
+
+GHCR images are private by default. Create a K8s secret:
+
+```bash
+kubectl create secret docker-registry ghcr-secret \
+  --namespace=missing-table \
+  --docker-server=ghcr.io \
+  --docker-username=YOUR_GITHUB_USER \
+  --docker-password=YOUR_GITHUB_TOKEN  # needs read:packages scope
+```
+
+Reference in deployment:
+
+```hcl
+spec {
+  image_pull_secrets {
+    name = "ghcr-secret"
+  }
+  container {
+    image = "ghcr.io/silverbeer/missing-table-backend:latest"
+  }
+}
+```
+
+### Ingress Path-Based Routing
+
+Single domain, multiple services:
+- `missingtable.com/` → frontend
+- `missingtable.com/api/*` → backend
+
+Uses nginx-ingress rewrite annotation:
+```hcl
+annotations = {
+  "nginx.ingress.kubernetes.io/rewrite-target" = "/$2"
+}
+```
+
+Path regex: `/api(/|$)(.*)` captures everything after `/api` and rewrites to `/$2`.
+
+### cert-manager + Let's Encrypt
+
+**Install order matters!** CRDs must exist before ClusterIssuer.
+
+1. Install cert-manager via Helm (includes CRDs)
+2. Apply ClusterIssuer separately (after Helm release completes)
+
+```yaml
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-prod
+spec:
+  acme:
+    server: https://acme-v02.api.letsencrypt.org/directory
+    email: your-email@example.com
+    privateKeySecretRef:
+      name: letsencrypt-prod-key
+    solvers:
+      - http01:
+          ingress:
+            class: nginx
+```
+
+Certificate auto-issues once DNS points to ingress IP.
+
+### DNS as IaC
+
+Managing DNS in DigitalOcean via OpenTofu:
+
+```hcl
+variable "domains" {
+  type = map(object({
+    records = list(object({
+      type  = string
+      name  = string
+      value = string
+      ttl   = optional(number, 3600)
+    }))
+  }))
+}
+
+resource "digitalocean_domain" "domains" {
+  for_each = var.domains
+  name     = each.key
+}
+```
+
+**Import existing resources:**
+```bash
+tofu import 'digitalocean_domain.domains["missingtable.com"]' missingtable.com
+tofu import 'digitalocean_record.records["missingtable.com-A-@-161.35.252.192"]' missingtable.com,RECORD_ID
+```
+
+Get record IDs via DO API:
+```bash
+curl -s "https://api.digitalocean.com/v2/domains/DOMAIN/records" \
+  -H "Authorization: Bearer $DIGITALOCEAN_TOKEN" | python3 -m json.tool
+```
+
+### Nameserver Changes Are Slow
+
+Changing NS records at registrar (Namecheap → DigitalOcean) can take 15 min to 48 hours to propagate globally.
+
+Check propagation:
+```bash
+dig missingtable.com NS +short         # Which NS is authoritative?
+dig missingtable.com @ns1.digitalocean.com +short  # What does DO say?
+```
+
+---
+
+## Folder Structure (Updated)
+
+```
+clouds/
+├── aws/
+│   └── environments/dev/     # EKS (Blue Belt - destroyed)
+└── digitalocean/
+    ├── environments/dev/     # DOKS cluster + app deployment
+    │   ├── versions.tf       # Providers (do, k8s, helm)
+    │   ├── main.tf           # Cluster, deployments, ingress, cert-manager
+    │   ├── variable.tf       # Secrets (supabase, etc)
+    │   ├── outputs.tf        # URLs, IPs
+    │   ├── terraform.tfvars  # Actual secret values (gitignored!)
+    │   └── cluster-issuer.yaml  # Applied after cert-manager
+    └── dns/                  # DNS for all domains
+        ├── versions.tf
+        ├── main.tf           # Domain + record resources
+        ├── variables.tf      # Domain schema
+        ├── outputs.tf
+        └── terraform.tfvars  # Domain configs
+
+modules/
+└── aws/
+    ├── vpc/                  # Reusable VPC module
+    └── eks/                  # Reusable EKS module
+```
+
+---
+
+## Cost Comparison
+
+| Platform | Control Plane | 2x Nodes | NAT/Network | Total |
+|----------|--------------|----------|-------------|-------|
+| AWS EKS | $73/mo | $60/mo | $32/mo | **~$165/mo** |
+| DO DOKS | **Free** | $48/mo | Included | **~$48/mo** |
+
+---
+
 ## Concepts
 
 ### Variables & Outputs
@@ -123,3 +340,18 @@ aws eks list-clusters
 # EKS cluster details
 aws eks describe-cluster --name CLUSTER_NAME
 ```
+
+ ## Future Learning Goals
+ - [ ] GitHub Actions Ninja - deep dive on caching, artifacts, matrix builds, reusable workflows
+
+  ## TODO: Coverage Configuration
+  - [ ] Move coverage threshold to pyproject.toml [tool.coverage.report]
+  - [ ] Current coverage: ~14% (needs work)
+  - [ ] Target: 50% initially, then 75%
+⏺ ## TODO: GitHub Configuration as IaC
+  - [ ] Add GitHub Terraform/OpenTofu provider to platform-bootstrap
+  - [ ] Manage repo settings as code (workflow permissions, branch protection)
+  - [ ] Manage GHCR package permissions as code
+  - [ ] Goal: Zero clicks in GitHub UI for repo configuration
+
+

@@ -48,43 +48,58 @@ ONE STEP AT A TIME. Never write multiple modules. Never skip ahead.
 | 🟠 Orange | First cloud resource deployed | ✅ ACHIEVED |
 | 🟢 Green | Working VPC module | ✅ ACHIEVED |
 | 🔵 Blue | Running EKS cluster | ✅ ACHIEVED |
-| 🟤 Brown | Multi-cloud (AWS + GCP) | |
+| 🟤 Brown | Multi-cloud (AWS + DO) | 🔄 IN PROGRESS |
 | ⚫ Black | All 4 clouds + CI/CD | |
 
-### Current Belt: 🔵 Blue
-**Earned**: Running EKS cluster with worker nodes, full IaC from scratch
+### Current Belt: 🟤 Brown (In Progress)
+**Working on**: DOKS cluster with full app deployment, TLS, DNS as IaC
 
 ---
 
 ## Current Progress
 Phase: 2 - Multi-Cloud
-Step: 2.1 - DOKS + GHCR
+Step: 2.2 - DOKS Complete, Awaiting DNS Propagation
 
-### Completed:
+### Completed (AWS - Blue Belt):
 - ✅ VPC module with public/private subnets (2 AZs)
 - ✅ Internet Gateway + NAT Gateway + route tables
 - ✅ EKS module (IAM roles, cluster, node groups)
 - ✅ Kubernetes provider in OpenTofu
 - ✅ Deployed nginx via IaC (namespace → deployment → service → LoadBalancer)
 - ✅ Verified external access to running container
-- ✅ Full destroy cycle
+- ✅ Full destroy cycle (EKS torn down to save costs)
 
-### Next Session - Brown Belt:
-1. Push missing-table images to GHCR (cloud-agnostic registry)
-2. Create DOKS module (DigitalOcean Kubernetes)
-3. Deploy missing-table + qualityplaybook.dev to DOKS
-4. Shared nginx-ingress for both apps (one LB, path-based routing)
-5. Compare cost: GKE $50/mo → DOKS ~$36/mo (both apps)
-6. Blog about the journey on qualityplaybook.dev
+### Completed (DigitalOcean - Brown Belt):
+- ✅ DOKS cluster via single resource (vs ~15 for EKS!)
+- ✅ Kubernetes + Helm providers configured
+- ✅ missing-table backend + frontend deployed
+- ✅ GHCR private images with imagePullSecrets
+- ✅ nginx-ingress controller (path-based routing)
+- ✅ cert-manager + Let's Encrypt ClusterIssuer
+- ✅ DNS managed via IaC (DigitalOcean DNS)
+- ⏳ Waiting for DNS propagation (Namecheap → DO nameservers)
+
+### Pending (to complete Brown Belt):
+- [ ] Verify https://missingtable.com works end-to-end
+- [ ] Add remaining 3 domains to DNS IaC
+- [ ] Clean destroy cycle for DOKS
+
+### Next - Black Belt:
+1. GKE (Google Cloud)
+2. AKS (Azure)
+3. CI/CD pipeline for deployments
+4. Multi-cluster networking
 
 ### Key Learnings:
 - `for_each` with maps for multi-resource creation
 - `each.key` and `each.value` for accessing map data
-- Kubernetes provider in OpenTofu for 100% IaC deployments
-- `kubernetes_namespace_v1`, `kubernetes_deployment_v1`, `kubernetes_service_v1`
-- LoadBalancer service type auto-creates cloud load balancer
-- GHCR is best for multi-cloud (same image path everywhere)
-- EKS ~$164/month vs DOKS ~$24/month for small clusters
+- Kubernetes + Helm providers in OpenTofu for 100% IaC
+- DOKS is dramatically simpler than EKS (1 resource vs ~15)
+- DOKS control plane is FREE ($73/mo savings vs EKS)
+- nginx-ingress rewrite annotation for path-based routing
+- cert-manager CRDs must exist before ClusterIssuer (timing issue)
+- `tofu import` to bring existing resources under IaC management
+- Nameserver changes propagate slowly (up to 48 hours)
 
 ---
 

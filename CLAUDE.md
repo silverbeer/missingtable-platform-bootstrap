@@ -47,40 +47,42 @@ ONE STEP AT A TIME. Never write multiple modules. Never skip ahead.
 | 🟡 Yellow | First `tofu apply` (local) | ✅ ACHIEVED |
 | 🟠 Orange | First cloud resource deployed | ✅ ACHIEVED |
 | 🟢 Green | Working VPC module | ✅ ACHIEVED |
-| 🔵 Blue | Running EKS cluster | |
+| 🔵 Blue | Running EKS cluster | ✅ ACHIEVED |
 | 🟤 Brown | Multi-cloud (AWS + GCP) | |
 | ⚫ Black | All 4 clouds + CI/CD | |
 
-### Current Belt: 🟢 Green
-**Earned**: Complete VPC module with public/private subnets, IGW, NAT Gateway, route tables across 2 AZs
+### Current Belt: 🔵 Blue
+**Earned**: Running EKS cluster with worker nodes, full IaC from scratch
 
 ---
 
 ## Current Progress
-Phase: 1 - AWS Foundation
-Step: 1.2 - EKS module next
+Phase: 2 - Multi-Cloud
+Step: 2.1 - DOKS + GHCR
 
 ### Completed:
 - ✅ VPC module with public/private subnets (2 AZs)
-- ✅ Internet Gateway + public route table
-- ✅ NAT Gateway + private route table
-- ✅ `for_each` for multi-AZ subnet creation
-- ✅ Full destroy cycle (no resources left burning)
+- ✅ Internet Gateway + NAT Gateway + route tables
+- ✅ EKS module (IAM roles, cluster, node groups)
+- ✅ Kubernetes provider in OpenTofu
+- ✅ Deployed nginx via IaC (namespace → deployment → service → LoadBalancer)
+- ✅ Verified external access to running container
+- ✅ Full destroy cycle
 
-### Next Session - Blue Belt:
-1. Create EKS module structure
-2. IAM roles for EKS cluster and nodes
-3. EKS cluster resource
-4. Node group in private subnets
-5. `kubectl` access configuration
+### Next Session - Brown Belt:
+1. Push missing-table images to GHCR (cloud-agnostic registry)
+2. Create DOKS module (DigitalOcean Kubernetes)
+3. Deploy missing-table to DOKS
+4. Compare cost/complexity: EKS vs DOKS
 
 ### Key Learnings:
 - `for_each` with maps for multi-resource creation
 - `each.key` and `each.value` for accessing map data
-- Public subnets: `map_public_ip_on_launch = true` + route to IGW
-- Private subnets: route to NAT Gateway for outbound
-- NAT Gateways cost ~$32/month - always destroy when not in use
-- AWS CLI with `--query` and `--output table` for verification
+- Kubernetes provider in OpenTofu for 100% IaC deployments
+- `kubernetes_namespace_v1`, `kubernetes_deployment_v1`, `kubernetes_service_v1`
+- LoadBalancer service type auto-creates cloud load balancer
+- GHCR is best for multi-cloud (same image path everywhere)
+- EKS ~$164/month vs DOKS ~$24/month for small clusters
 
 ---
 

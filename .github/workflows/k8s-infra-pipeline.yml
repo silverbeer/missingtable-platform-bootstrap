@@ -1,0 +1,45 @@
+name: K8s Infra Pipeline
+on: 
+  workflow_dispatch:
+    inputs:
+      command:
+        description: OpenTofu command to run (plan, apply, destroy)
+        required: true
+        default: plan
+        type: choice
+        options:
+          - plan
+          - apply
+          - destroy
+      cloud:
+        description: Cloud to deploy to (digitalocean, aws, gcp)
+        required: true
+        default: digitalocean
+        type: choice
+        options:
+          - digitalocean
+      environment:
+        description: Environment to deploy to (dev)
+        required: true
+        default: dev
+        type: choice
+        options:
+          - dev          
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: clouds/${{ inputs.cloud }}/environments/${{ inputs.environment }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      - name: Set up OpenTofu
+        uses: opentofu/setup-opentofu@v1
+      - name: Configure cloud credentials
+        run: echo "DIGITALOCEAN_TOKEN=${{ secrets.DIGITALOCEAN_TOKEN }}" >> $GITHUB_ENV        
+      - name: Run OpenTofu init
+        run: tofu init
+      - name: Run OpenTofu command
+        run: tofu ${{ inputs.command }}

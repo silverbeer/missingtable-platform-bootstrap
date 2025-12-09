@@ -17,19 +17,23 @@ Quick notes captured during OpenTofu ninja training. Will be formalized later.
 | Namespaces | 3 | app, ingress-nginx, cert-manager |
 | Deployments | 2 | Frontend, Backend |
 | Services | 2 | ClusterIP for both |
-| Secrets | 1 | GHCR image pull |
+| Secrets | 2 | GHCR image pull, DO API token for DNS-01 |
 | Helm Releases | 2 | nginx-ingress, cert-manager |
-| ClusterIssuer | 1 | Let's Encrypt (via kubectl provider) |
+| ClusterIssuer | 1 | Let's Encrypt with DNS-01 (via kubectl provider) |
 | Ingress | 1 | TLS + path routing |
 | DNS Domain | 1 | missingtable.com |
 | DNS Records | 2 | @ and www A records |
 
-**Total**: 17 resources from single `tofu apply`
+**Total**: 18 resources from single `tofu apply`
 
-**The trick**: DNS records reference ingress IP dynamically:
+**Two tricks for true 100% IaC:**
+
+1. **Dynamic DNS** - Records reference ingress IP directly:
 ```hcl
 value = data.kubernetes_service_v1.ingress_nginx.status[0].load_balancer[0].ingress[0].ip
 ```
+
+2. **DNS-01 challenge** - TLS certificate issued via DNS verification, not HTTP. No timing dependency on DNS propagation.
 
 ### DOKS vs EKS - Simplicity Wins
 
@@ -157,26 +161,62 @@ We initially used rewrite but got 404s - backend expected `/api/auth/login`, not
 **Install order matters!** CRDs must exist before ClusterIssuer.
 
 1. Install cert-manager via Helm (includes CRDs)
-2. Apply ClusterIssuer separately (after Helm release completes)
+2. Wait for CRDs (`time_sleep` resource)
+3. Apply ClusterIssuer
 
-```yaml
-apiVersion: cert-manager.io/v1
-kind: ClusterIssuer
-metadata:
-  name: letsencrypt-prod
-spec:
-  acme:
-    server: https://acme-v02.api.letsencrypt.org/directory
-    email: your-email@example.com
-    privateKeySecretRef:
-      name: letsencrypt-prod-key
-    solvers:
-      - http01:
-          ingress:
-            class: nginx
+#### HTTP-01 vs DNS-01 Challenge
+
+| Challenge | How it works | IaC-friendly? |
+|-----------|--------------|---------------|
+| HTTP-01 | Let's Encrypt hits `/.well-known/acme-challenge/*` | No - depends on DNS propagation timing |
+| DNS-01 | cert-manager creates TXT record via cloud API | **Yes** - no timing dependency |
+
+**Problem with HTTP-01**: On destroy/rebuild, DNS updates to new IP but Let's Encrypt may still have old IP cached. Challenge fails, requires manual cert deletion.
+
+**Solution**: Use DNS-01 with DigitalOcean API:
+
+```hcl
+# Secret for DO API access
+resource "kubernetes_secret_v1" "digitalocean_dns" {
+  metadata {
+    name      = "digitalocean-dns"
+    namespace = "cert-manager"
+  }
+  data = {
+    access-token = var.digitalocean_token
+  }
+}
+
+# ClusterIssuer with DNS-01
+resource "kubectl_manifest" "letsencrypt_issuer" {
+  yaml_body = <<-YAML
+    apiVersion: cert-manager.io/v1
+    kind: ClusterIssuer
+    metadata:
+      name: letsencrypt-prod
+    spec:
+      acme:
+        server: https://acme-v02.api.letsencrypt.org/directory
+        email: ${var.letsencrypt_email}
+        privateKeySecretRef:
+          name: letsencrypt-prod-key
+        solvers:
+          - dns01:
+              digitalocean:
+                tokenSecretRef:
+                  name: digitalocean-dns
+                  key: access-token
+  YAML
+}
 ```
 
-Certificate auto-issues once DNS points to ingress IP.
+DNS-01 flow:
+1. cert-manager creates `_acme-challenge.missingtable.com` TXT record
+2. Let's Encrypt verifies TXT record
+3. Certificate issued
+4. TXT record cleaned up
+
+No HTTP routing needed, no DNS propagation timing issues.
 
 ### DNS as IaC - True 100% IaC
 

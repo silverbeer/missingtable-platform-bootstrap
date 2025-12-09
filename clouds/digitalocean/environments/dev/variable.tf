@@ -34,3 +34,9 @@ variable "ghcr_token" {
     type        = string
     sensitive   = true
 }
+
+variable "digitalocean_token" {
+    description = "DigitalOcean API token for DNS-01 challenge"
+    type        = string
+    sensitive   = true
+}

@@ -327,9 +327,8 @@ resource "kubernetes_ingress_v1" "app" {
     name      = "missing-table-ingress"
     namespace = kubernetes_namespace_v1.app.metadata[0].name
     annotations = {
-      "nginx.ingress.kubernetes.io/rewrite-target" = "/$2"
-      "cert-manager.io/cluster-issuer"             = "letsencrypt-prod"
-      "nginx.ingress.kubernetes.io/ssl-redirect"   = "true"
+      "cert-manager.io/cluster-issuer"           = "letsencrypt-prod"
+      "nginx.ingress.kubernetes.io/ssl-redirect" = "true"
     }
   }
 
@@ -346,8 +345,8 @@ resource "kubernetes_ingress_v1" "app" {
       host = "missingtable.com"
       http {
         path {
-          path      = "/api(/|$)(.*)"
-          path_type = "ImplementationSpecific"
+          path      = "/api"
+          path_type = "Prefix"
 
           backend {
             service {
@@ -361,8 +360,8 @@ resource "kubernetes_ingress_v1" "app" {
 
         # Frontend routes: /* -> frontend-service:8080
         path {
-          path      = "/()(.*)"
-          path_type = "ImplementationSpecific"
+          path      = "/"
+          path_type = "Prefix"
 
           backend {
             service {
@@ -388,4 +387,28 @@ data "kubernetes_service_v1" "ingress_nginx" {
   }
 
   depends_on = [helm_release.ingress_nginx]
+}
+
+# =============================================================================
+# DNS - Managed with infrastructure for true 100% IaC
+# =============================================================================
+
+resource "digitalocean_domain" "missingtable" {
+  name = "missingtable.com"
+}
+
+resource "digitalocean_record" "root" {
+  domain = digitalocean_domain.missingtable.id
+  type   = "A"
+  name   = "@"
+  value  = data.kubernetes_service_v1.ingress_nginx.status[0].load_balancer[0].ingress[0].ip
+  ttl    = 3600
+}
+
+resource "digitalocean_record" "www" {
+  domain = digitalocean_domain.missingtable.id
+  type   = "A"
+  name   = "www"
+  value  = data.kubernetes_service_v1.ingress_nginx.status[0].load_balancer[0].ingress[0].ip
+  ttl    = 3600
 }

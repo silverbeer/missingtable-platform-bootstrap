@@ -6,6 +6,31 @@ Quick notes captured during OpenTofu ninja training. Will be formalized later.
 
 ## DigitalOcean (Blue Belt → Brown Belt)
 
+### 100% IaC Achieved
+
+**Definition**: `tofu destroy && tofu apply` recreates everything with zero manual steps.
+
+**What's managed:**
+| Resource | Count | Purpose |
+|----------|-------|---------|
+| DOKS Cluster | 1 | Kubernetes control plane + nodes |
+| Namespaces | 3 | app, ingress-nginx, cert-manager |
+| Deployments | 2 | Frontend, Backend |
+| Services | 2 | ClusterIP for both |
+| Secrets | 1 | GHCR image pull |
+| Helm Releases | 2 | nginx-ingress, cert-manager |
+| ClusterIssuer | 1 | Let's Encrypt (via kubectl provider) |
+| Ingress | 1 | TLS + path routing |
+| DNS Domain | 1 | missingtable.com |
+| DNS Records | 2 | @ and www A records |
+
+**Total**: 17 resources from single `tofu apply`
+
+**The trick**: DNS records reference ingress IP dynamically:
+```hcl
+value = data.kubernetes_service_v1.ingress_nginx.status[0].load_balancer[0].ingress[0].ip
+```
+
 ### DOKS vs EKS - Simplicity Wins
 
 | Component | EKS (AWS) | DOKS (DigitalOcean) |
@@ -102,14 +127,30 @@ Single domain, multiple services:
 - `missingtable.com/` → frontend
 - `missingtable.com/api/*` → backend
 
-Uses nginx-ingress rewrite annotation:
+**Important**: Check if your backend expects `/api` prefix or not!
+
+If backend routes are `/api/auth/login` (prefix included):
 ```hcl
-annotations = {
-  "nginx.ingress.kubernetes.io/rewrite-target" = "/$2"
+# Simple prefix matching - no rewrite needed
+path {
+  path      = "/api"
+  path_type = "Prefix"
 }
 ```
 
-Path regex: `/api(/|$)(.*)` captures everything after `/api` and rewrites to `/$2`.
+If backend routes are `/auth/login` (no prefix):
+```hcl
+# Rewrite to strip /api prefix
+annotations = {
+  "nginx.ingress.kubernetes.io/rewrite-target" = "/$2"
+}
+path {
+  path      = "/api(/|$)(.*)"
+  path_type = "ImplementationSpecific"
+}
+```
+
+We initially used rewrite but got 404s - backend expected `/api/auth/login`, not `/auth/login`.
 
 ### cert-manager + Let's Encrypt
 
@@ -137,39 +178,39 @@ spec:
 
 Certificate auto-issues once DNS points to ingress IP.
 
-### DNS as IaC
+### DNS as IaC - True 100% IaC
 
-Managing DNS in DigitalOcean via OpenTofu:
+**Problem**: LoadBalancer IPs change on destroy/rebuild. If DNS is separate, you need to manually update the IP.
+
+**Solution**: Manage DNS in the same module, reference ingress IP directly:
 
 ```hcl
-variable "domains" {
-  type = map(object({
-    records = list(object({
-      type  = string
-      name  = string
-      value = string
-      ttl   = optional(number, 3600)
-    }))
-  }))
+resource "digitalocean_domain" "missingtable" {
+  name = "missingtable.com"
 }
 
-resource "digitalocean_domain" "domains" {
-  for_each = var.domains
-  name     = each.key
+resource "digitalocean_record" "root" {
+  domain = digitalocean_domain.missingtable.id
+  type   = "A"
+  name   = "@"
+  # Dynamic reference - updates automatically on rebuild!
+  value  = data.kubernetes_service_v1.ingress_nginx.status[0].load_balancer[0].ingress[0].ip
+  ttl    = 3600
 }
 ```
 
 **Import existing resources:**
 ```bash
-tofu import 'digitalocean_domain.domains["missingtable.com"]' missingtable.com
-tofu import 'digitalocean_record.records["missingtable.com-A-@-161.35.252.192"]' missingtable.com,RECORD_ID
-```
-
-Get record IDs via DO API:
-```bash
+# Get record IDs from DO API
 curl -s "https://api.digitalocean.com/v2/domains/DOMAIN/records" \
   -H "Authorization: Bearer $DIGITALOCEAN_TOKEN" | python3 -m json.tool
+
+# Import domain and records
+tofu import -var-file=terraform.tfvars digitalocean_domain.missingtable missingtable.com
+tofu import -var-file=terraform.tfvars digitalocean_record.root missingtable.com,RECORD_ID
 ```
+
+**Why this matters**: `tofu destroy && tofu apply` now works with zero manual steps. DNS auto-updates to new IP.
 
 ### Nameserver Changes Are Slow
 
@@ -190,25 +231,21 @@ clouds/
 ├── aws/
 │   └── environments/dev/     # EKS (Blue Belt - destroyed)
 └── digitalocean/
-    ├── environments/dev/     # DOKS cluster + app deployment
-    │   ├── versions.tf       # Providers (do, k8s, helm)
-    │   ├── main.tf           # Cluster, deployments, ingress, cert-manager
-    │   ├── variable.tf       # Secrets (supabase, etc)
+    ├── environments/dev/     # DOKS cluster + app + DNS (100% IaC)
+    │   ├── versions.tf       # Providers (do, k8s, helm, kubectl, time)
+    │   ├── main.tf           # Cluster, deployments, ingress, cert-manager, DNS
+    │   ├── variable.tf       # Secrets (supabase, ghcr, etc)
     │   ├── outputs.tf        # URLs, IPs
-    │   ├── terraform.tfvars  # Actual secret values (gitignored!)
-    │   └── cluster-issuer.yaml  # Applied after cert-manager
-    └── dns/                  # DNS for all domains
-        ├── versions.tf
-        ├── main.tf           # Domain + record resources
-        ├── variables.tf      # Domain schema
-        ├── outputs.tf
-        └── terraform.tfvars  # Domain configs
+    │   └── terraform.tfvars  # Actual secret values (gitignored!)
+    └── dns/                  # DEPRECATED - DNS moved to environments/dev
 
 modules/
 └── aws/
     ├── vpc/                  # Reusable VPC module
     └── eks/                  # Reusable EKS module
 ```
+
+**Key insight**: DNS in same module as infrastructure = true 100% IaC. Separate DNS module required manual IP updates on rebuild.
 
 ---
 

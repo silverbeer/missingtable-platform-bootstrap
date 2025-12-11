@@ -34,6 +34,7 @@ This repository manages infrastructure for two production domains:
 
 ### What's Deployed
 
+<<<<<<< HEAD
 **DigitalOcean DOKS (Production):**
 - ✅ Kubernetes cluster (2 nodes, $48/month)
 - ✅ Application deployments (frontend + backend)

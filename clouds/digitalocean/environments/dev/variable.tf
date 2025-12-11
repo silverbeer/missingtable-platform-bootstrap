@@ -40,3 +40,15 @@ variable "digitalocean_token" {
     type        = string
     sensitive   = true
 }
+
+variable "aws_access_key_id" {
+    description = "AWS access key ID for External Secrets"
+    type        = string
+    sensitive   = true
+}
+
+variable "aws_secret_access_key" {
+    description = "AWS secret access key for External Secrets"
+    type        = string
+    sensitive   = true
+}

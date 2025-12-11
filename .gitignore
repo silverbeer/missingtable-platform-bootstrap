@@ -23,3 +23,14 @@ override.tf.json
 *.pem
 *.key
 secrets/
+
+# Lambda functions
+output.json
+lambda/output.json
+lambda.zip
+
+# Python
+*__pycache__/
+*.pyc
+*.pyo
+*.pyd

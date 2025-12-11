@@ -1,3 +1,7 @@
+# =============================================================================
+# DOKS CLUSTER
+# =============================================================================
+
 resource "digitalocean_kubernetes_cluster" "main" {
   name    = "missingtable-dev"
   region  = "nyc1"
@@ -10,232 +14,10 @@ resource "digitalocean_kubernetes_cluster" "main" {
   }
 }
 
-# Namespace
-resource "kubernetes_namespace_v1" "app" {
-  metadata {
-    name = "missing-table"
-  }
-
-  depends_on = [digitalocean_kubernetes_cluster.main]
-}
-
-# GHCR Image Pull Secret
-resource "kubernetes_secret_v1" "ghcr" {
-  metadata {
-    name      = "ghcr-secret"
-    namespace = kubernetes_namespace_v1.app.metadata[0].name
-  }
-
-  type = "kubernetes.io/dockerconfigjson"
-
-  data = {
-    ".dockerconfigjson" = jsonencode({
-      auths = {
-        "ghcr.io" = {
-          auth = base64encode("${var.ghcr_username}:${var.ghcr_token}")
-        }
-      }
-    })
-  }
-}
-
-# Backend Deployment
-resource "kubernetes_deployment_v1" "backend" {
-  metadata {
-    name      = "backend"
-    namespace = kubernetes_namespace_v1.app.metadata[0].name
-    labels = {
-      app = "backend"
-    }
-  }
-
-  spec {
-    replicas = 1
-
-    selector {
-      match_labels = {
-        app = "backend"
-      }
-    }
-
-    template {
-      metadata {
-        labels = {
-          app = "backend"
-        }
-      }
-
-      spec {
-        image_pull_secrets {
-          name = "ghcr-secret"
-        }
-
-        container {
-          name  = "backend"
-          image = "ghcr.io/silverbeer/missing-table-backend:latest"
-
-          port {
-            container_port = 8000
-          }
-
-          env {
-            name  = "DATABASE_URL"
-            value = var.database_url
-          }
-
-          env {
-            name  = "SUPABASE_URL"
-            value = var.supabase_url
-          }
-
-          env {
-            name  = "SUPABASE_ANON_KEY"
-            value = var.supabase_anon_key
-          }
-
-          env {
-            name  = "SUPABASE_JWT_SECRET"
-            value = var.supabase_jwt_secret
-          }
-
-          env {
-            name  = "ENVIRONMENT"
-            value = "development"
-          }
-
-          env {
-            name  = "DISABLE_SECURITY"
-            value = "true"
-          }
-
-          env {
-            name  = "DISABLE_LOGFIRE"
-            value = "true"
-          }
-
-          env {
-            name  = "CORS_ORIGINS"
-            value = "*"
-          }
-
-          resources {
-            requests = {
-              cpu    = "200m"
-              memory = "256Mi"
-            }
-            limits = {
-              cpu    = "500m"
-              memory = "512Mi"
-            }
-          }
-        }
-      }
-    }
-  }
-}
-
-# Backend Service
-resource "kubernetes_service_v1" "backend" {
-  metadata {
-    name      = "backend-service"
-    namespace = kubernetes_namespace_v1.app.metadata[0].name
-  }
-
-  spec {
-    selector = {
-      app = "backend"
-    }
-
-    port {
-      port        = 8000
-      target_port = 8000
-    }
-
-    type = "ClusterIP"
-  }
-}
-
-# Frontend Deployment
-resource "kubernetes_deployment_v1" "frontend" {
-  metadata {
-    name      = "frontend"
-    namespace = kubernetes_namespace_v1.app.metadata[0].name
-    labels = {
-      app = "frontend"
-    }
-  }
-
-  spec {
-    replicas = 1
-
-    selector {
-      match_labels = {
-        app = "frontend"
-      }
-    }
-
-    template {
-      metadata {
-        labels = {
-          app = "frontend"
-        }
-      }
-
-      spec {
-        image_pull_secrets {
-          name = "ghcr-secret"
-        }
-
-        container {
-          name  = "frontend"
-          image = "ghcr.io/silverbeer/missing-table-frontend:latest"
-
-          port {
-            container_port = 8080
-          }
-
-          resources {
-            requests = {
-              cpu    = "100m"
-              memory = "128Mi"
-            }
-            limits = {
-              cpu    = "200m"
-              memory = "256Mi"
-            }
-          }
-        }
-      }
-    }
-  }
-}
-
-# Frontend Service (ClusterIP - exposed via Ingress)
-resource "kubernetes_service_v1" "frontend" {
-  metadata {
-    name      = "frontend-service"
-    namespace = kubernetes_namespace_v1.app.metadata[0].name
-  }
-
-  spec {
-    selector = {
-      app = "frontend"
-    }
-
-    port {
-      port        = 8080
-      target_port = 8080
-    }
-
-    type = "ClusterIP"
-  }
-}
-
 # =============================================================================
-# INGRESS CONTROLLER & ROUTING
+# INGRESS CONTROLLER
 # =============================================================================
 
-# Namespace for ingress controller
 resource "kubernetes_namespace_v1" "ingress_nginx" {
   metadata {
     name = "ingress-nginx"
@@ -244,7 +26,6 @@ resource "kubernetes_namespace_v1" "ingress_nginx" {
   depends_on = [digitalocean_kubernetes_cluster.main]
 }
 
-# nginx-ingress controller via Helm
 resource "helm_release" "ingress_nginx" {
   name       = "ingress-nginx"
   repository = "https://kubernetes.github.io/ingress-nginx"
@@ -260,139 +41,6 @@ resource "helm_release" "ingress_nginx" {
   depends_on = [kubernetes_namespace_v1.ingress_nginx]
 }
 
-# =============================================================================
-# CERT-MANAGER FOR TLS
-# =============================================================================
-
-# Namespace for cert-manager
-resource "kubernetes_namespace_v1" "cert_manager" {
-  metadata {
-    name = "cert-manager"
-  }
-
-  depends_on = [digitalocean_kubernetes_cluster.main]
-}
-
-# cert-manager via Helm
-resource "helm_release" "cert_manager" {
-  name       = "cert-manager"
-  repository = "https://charts.jetstack.io"
-  chart      = "cert-manager"
-  namespace  = kubernetes_namespace_v1.cert_manager.metadata[0].name
-  version    = "1.14.0"
-
-  set {
-    name  = "installCRDs"
-    value = "true"
-  }
-
-  depends_on = [kubernetes_namespace_v1.cert_manager]
-}
-
-# Wait for cert-manager CRDs to be ready
-resource "time_sleep" "wait_for_cert_manager" {
-  depends_on      = [helm_release.cert_manager]
-  create_duration = "30s"
-}
-
-# DigitalOcean API token secret for DNS-01 challenge
-resource "kubernetes_secret_v1" "digitalocean_dns" {
-  metadata {
-    name      = "digitalocean-dns"
-    namespace = kubernetes_namespace_v1.cert_manager.metadata[0].name
-  }
-
-  data = {
-    access-token = var.digitalocean_token
-  }
-}
-
-# Let's Encrypt ClusterIssuer with DNS-01 challenge
-resource "kubectl_manifest" "letsencrypt_issuer" {
-  yaml_body = <<-YAML
-    apiVersion: cert-manager.io/v1
-    kind: ClusterIssuer
-    metadata:
-      name: letsencrypt-prod
-    spec:
-      acme:
-        server: https://acme-v02.api.letsencrypt.org/directory
-        email: ${var.letsencrypt_email}
-        privateKeySecretRef:
-          name: letsencrypt-prod-key
-        solvers:
-          - dns01:
-              digitalocean:
-                tokenSecretRef:
-                  name: digitalocean-dns
-                  key: access-token
-  YAML
-
-  depends_on = [time_sleep.wait_for_cert_manager, kubernetes_secret_v1.digitalocean_dns]
-}
-
-# =============================================================================
-# INGRESS WITH TLS
-# =============================================================================
-
-# Ingress resource for routing
-resource "kubernetes_ingress_v1" "app" {
-  metadata {
-    name      = "missing-table-ingress"
-    namespace = kubernetes_namespace_v1.app.metadata[0].name
-    annotations = {
-      "cert-manager.io/cluster-issuer"           = "letsencrypt-prod"
-      "nginx.ingress.kubernetes.io/ssl-redirect" = "true"
-    }
-  }
-
-  spec {
-    ingress_class_name = "nginx"
-
-    tls {
-      hosts       = ["missingtable.com"]
-      secret_name = "missingtable-tls"
-    }
-
-    # Backend API routes: /api/* -> backend-service:8000
-    rule {
-      host = "missingtable.com"
-      http {
-        path {
-          path      = "/api"
-          path_type = "Prefix"
-
-          backend {
-            service {
-              name = kubernetes_service_v1.backend.metadata[0].name
-              port {
-                number = 8000
-              }
-            }
-          }
-        }
-
-        # Frontend routes: /* -> frontend-service:8080
-        path {
-          path      = "/"
-          path_type = "Prefix"
-
-          backend {
-            service {
-              name = kubernetes_service_v1.frontend.metadata[0].name
-              port {
-                number = 8080
-              }
-            }
-          }
-        }
-      }
-    }
-  }
-
-  depends_on = [helm_release.ingress_nginx, helm_release.cert_manager]
-}
-
 # Data source to get ingress controller LoadBalancer IP
 data "kubernetes_service_v1" "ingress_nginx" {
   metadata {
@@ -404,25 +52,157 @@ data "kubernetes_service_v1" "ingress_nginx" {
 }
 
 # =============================================================================
-# DNS - Managed with infrastructure for true 100% IaC
+# EXTERNAL SECRETS OPERATOR - Sync TLS certs from AWS Secrets Manager
 # =============================================================================
+resource "kubernetes_namespace_v1" "external_secrets" {
+  metadata {
+    name = "external-secrets"
+  }
 
-resource "digitalocean_domain" "missingtable" {
-  name = "missingtable.com"
+  depends_on = [digitalocean_kubernetes_cluster.main]
 }
 
-resource "digitalocean_record" "root" {
-  domain = digitalocean_domain.missingtable.id
-  type   = "A"
-  name   = "@"
-  value  = data.kubernetes_service_v1.ingress_nginx.status[0].load_balancer[0].ingress[0].ip
-  ttl    = 3600
+resource "helm_release" "external_secrets" {
+  name       = "external-secrets"
+  repository = "https://charts.external-secrets.io"
+  chart      = "external-secrets"
+  namespace  = kubernetes_namespace_v1.external_secrets.metadata[0].name
+  version    = "0.9.11"
+
+  set {
+    name  = "provider.aws.region"
+    value = "us-east-1"
+  }
+
+  set {
+    name = "installCRDs"
+    value = true
+  }
+
+  depends_on = [kubernetes_namespace_v1.external_secrets]
 }
 
-resource "digitalocean_record" "www" {
-  domain = digitalocean_domain.missingtable.id
-  type   = "A"
-  name   = "www"
-  value  = data.kubernetes_service_v1.ingress_nginx.status[0].load_balancer[0].ingress[0].ip
-  ttl    = 3600
+# AWS credentials for External Secrets to read from Secrets Manager
+resource "kubernetes_secret_v1" "aws_credentials" {
+  metadata {
+    name = "aws-credentials"
+    namespace = kubernetes_namespace_v1.external_secrets.metadata[0].name
+  }
+
+  data = {
+    access-key-id = var.aws_access_key_id
+    secret-access-key = var.aws_secret_access_key
+  }
 }
+
+resource "time_sleep" "wait_for_external_secrets" {
+    depends_on = [helm_release.external_secrets]
+    create_duration = "30s"
+}
+
+# ClusterSecretStore - cluster-wide access to AWS Secrets Manager
+resource "kubectl_manifest" "aws_secret_store" {
+    yaml_body = <<YAML
+      apiVersion: external-secrets.io/v1beta1
+      kind: ClusterSecretStore
+      metadata:
+        name: aws-secrets-manager
+      spec:
+        provider:
+          aws:
+            service: SecretsManager            
+            region: us-east-2
+            auth:
+              secretRef:
+                accessKeyIDSecretRef:
+                  name: aws-credentials
+                  namespace: external-secrets
+                  key: access-key-id
+                secretAccessKeySecretRef:
+                  name: aws-credentials
+                  namespace: external-secrets
+                  key: secret-access-key                
+    YAML
+
+    depends_on = [time_sleep.wait_for_external_secrets, kubernetes_secret_v1.aws_credentials]
+}
+
+# =============================================================================
+# EXTERNAL SECRET - Sync TLS certificate from AWS to K8s
+# =============================================================================
+resource "kubectl_manifest" "tls_external_secret" {
+    yaml_body = <<YAML
+      apiVersion: external-secrets.io/v1beta1
+      kind: ExternalSecret
+      metadata:
+        name: missing-table-tls
+        namespace: missing-table
+      spec:
+        refreshInterval: 24h
+        secretStoreRef:
+          name: aws-secrets-manager
+          kind: ClusterSecretStore
+        target:
+          name: missing-table-tls
+          template:
+            type: kubernetes.io/tls
+            data:
+              tls.crt: "{{ .cert }}"
+              tls.key: "{{ .key }}"
+        data:
+          - secretKey: cert
+            remoteRef:
+              key: missingtable.com-tls
+              property: fullchain
+          - secretKey: key
+            remoteRef:
+              key: missingtable.com-tls
+              property: private_key
+    YAML
+
+    depends_on = [kubectl_manifest.aws_secret_store]
+}
+
+# =============================================================================
+# EXTERNAL SECRET - Sync qualityplaybook.dev TLS certificate
+# =============================================================================
+resource "kubectl_manifest" "qualityplaybook_tls_external_secret" {
+    yaml_body = <<YAML
+      apiVersion: external-secrets.io/v1beta1
+      kind: ExternalSecret
+      metadata:
+        name: qualityplaybook-tls
+        namespace: qualityplaybook
+      spec:
+        refreshInterval: 24h
+        secretStoreRef:
+          name: aws-secrets-manager
+          kind: ClusterSecretStore
+        target:
+          name: qualityplaybook-tls
+          template:
+            type: kubernetes.io/tls
+            data:
+              tls.crt: "{{ .cert }}"
+              tls.key: "{{ .key }}"
+        data:
+          - secretKey: cert
+            remoteRef:
+              key: qualityplaybook.dev-tls
+              property: fullchain
+          - secretKey: key
+            remoteRef:
+              key: qualityplaybook.dev-tls
+              property: private_key
+    YAML
+
+    depends_on = [kubectl_manifest.aws_secret_store]
+}
+
+resource "kubernetes_namespace_v1" "qualityplaybook" {    
+    metadata {
+      name = "qualityplaybook"
+    }
+
+    depends_on = [digitalocean_kubernetes_cluster.main]
+  }

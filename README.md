@@ -20,21 +20,8 @@ This repository manages infrastructure for two production domains:
 - **missingtable.com** - Table reservation application
 - **qualityplaybook.dev** - Software quality resources
 
-## Current Status: 🟤 Brown Belt (Multi-Cloud)
+## What's Deployed
 
-| Belt | Milestone | Status |
-|------|-----------|--------|
-| ⬜ White | Project setup | ✅ Complete |
-| 🟡 Yellow | First `tofu apply` | ✅ Complete |
-| 🟠 Orange | First cloud resource | ✅ Complete |
-| 🟢 Green | VPC module | ✅ Complete |
-| 🔵 Blue | EKS cluster | ✅ Complete |
-| 🟤 Brown | Multi-cloud (AWS + DO) | 🔄 In Progress |
-| ⚫ Black | All 4 clouds + CI/CD | Planned |
-
-### What's Deployed
-
-<<<<<<< HEAD
 **DigitalOcean DOKS (Production):**
 - ✅ Kubernetes cluster (2 nodes, $48/month)
 - ✅ Application deployments (frontend + backend)
@@ -225,10 +212,6 @@ MIT License - see [LICENSE](LICENSE) file for details.
 
 ## Acknowledgments
 
-Built as part of the OpenTofu Ninja Training journey, progressing from White Belt (first `tofu apply`) to Black Belt (multi-cloud mastery).
+A learning project demonstrating multi-cloud Infrastructure as Code with real production workloads.
 
-Coached by Claude Code - an AI pair programmer that emphasizes learning over shortcuts.
-
----
-
-**Status:** 🟤 Brown Belt in progress | **Next:** Complete DOKS deployment, add GKE and AKS
+Built with assistance from Claude Code - an AI pair programmer that emphasizes learning over shortcuts.

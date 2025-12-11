@@ -7,5 +7,4 @@ variable "domain_name" {
 variable "letsencrypt_email" {
     description = "The email address to use for Let's Encrypt"
     type = string
-    default = "silverbeer.io@gmail.com"
 }

@@ -1,0 +1,94 @@
+name: Deploy Certbot Lambda
+
+on:
+  push:
+    paths:
+      - 'clouds/aws/global/certificate-management/lambda/**'
+      - '.github/workflows/lambda-certbot-deploy.yml'
+    branches:
+      - main
+      - public-repo-prep
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write   # Required for OIDC
+      contents: read    # Required to checkout code
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_OIDC_ROLE_ARN }}
+          aws-region: us-east-2
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Get ECR repository URI
+        id: ecr-uri
+        run: |
+          ECR_URI=$(aws ecr describe-repositories --repository-names certbot-lambda --region us-east-2 --query 'repositories[0].repositoryUri' --output text)
+          echo "ecr_uri=$ECR_URI" >> $GITHUB_OUTPUT
+          echo "ECR Repository URI: $ECR_URI"
+
+      - name: Build Docker image
+        working-directory: clouds/aws/global/certificate-management/lambda
+        run: |
+          docker build -t certbot-lambda:latest .
+          docker tag certbot-lambda:latest ${{ steps.ecr-uri.outputs.ecr_uri }}:latest
+          docker tag certbot-lambda:latest ${{ steps.ecr-uri.outputs.ecr_uri }}:${{ github.sha }}
+
+      - name: Push to ECR
+        run: |
+          docker push ${{ steps.ecr-uri.outputs.ecr_uri }}:latest
+          docker push ${{ steps.ecr-uri.outputs.ecr_uri }}:${{ github.sha }}
+
+      - name: Update Lambda functions
+        run: |
+          # Update missingtable.com Lambda
+          aws lambda update-function-code \
+            --function-name certbot-renewal \
+            --image-uri ${{ steps.ecr-uri.outputs.ecr_uri }}:latest \
+            --region us-east-2
+
+          # Update qualityplaybook.dev Lambda
+          aws lambda update-function-code \
+            --function-name certbot-renewal-qualityplaybook \
+            --image-uri ${{ steps.ecr-uri.outputs.ecr_uri }}:latest \
+            --region us-east-2
+
+      - name: Wait for Lambda update to complete
+        run: |
+          echo "Waiting for certbot-renewal to be ready..."
+          aws lambda wait function-updated-v2 --function-name certbot-renewal --region us-east-2
+
+          echo "Waiting for certbot-renewal-qualityplaybook to be ready..."
+          aws lambda wait function-updated-v2 --function-name certbot-renewal-qualityplaybook --region us-east-2
+
+      - name: Test Lambda invocation (dry-run)
+        run: |
+          echo "Testing certbot-renewal Lambda with dry-run..."
+          aws lambda invoke \
+            --function-name certbot-renewal \
+            --region us-east-2 \
+            --payload '{"dry_run": true}' \
+            --cli-binary-format raw-in-base64-out \
+            /tmp/lambda-response.json
+
+          echo "Lambda response:"
+          cat /tmp/lambda-response.json
+
+          # Check if invocation was successful
+          if grep -q "FunctionError" /tmp/lambda-response.json; then
+            echo "Lambda invocation failed!"
+            exit 1
+          fi
+
+          echo "Lambda deployment and test successful!"

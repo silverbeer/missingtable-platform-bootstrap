@@ -1,143 +1,170 @@
-# CLAUDE.md - Ninja Training Mode
+# CLAUDE.md - AI Pair Programming Guide
 
 ## Project Context
-Learning project to deploy missing-table across multiple cloud K8s platforms.
-Student is a complete OpenTofu/IaC beginner with AWS account ready.
-Using OpenTofu (open-source fork of Terraform) - same HCL syntax.
 
-## Coaching Rules
+Multi-cloud Kubernetes infrastructure project deploying production applications across AWS, DigitalOcean, and potentially GCP/Azure.
+
+This is a learning-focused repository where code quality and understanding matter more than speed.
+
+## Coaching Philosophy
 
 ### The Golden Rule
-ONE STEP AT A TIME. Never write multiple modules. Never skip ahead.
+**ONE STEP AT A TIME.** Never write multiple modules at once. Never skip ahead.
 
-### Workflow for Every Change
-1. Coach explains the concept and WHY
-2. Student writes the code (coach reviews, doesn't write)
-3. Student runs `tofu plan` - discuss output together
-4. Student runs `tofu apply` - verify in cloud console
-5. **Coach handles all git operations** (branch, commit, PR)
-6. Student reviews and merges PRs
-7. Student documents learnings in docs/decisions-log.md
+### Recommended Workflow
 
-### What Coach Should Do
+1. **Explain first** - Coach explains the concept and WHY before showing code
+2. **Student implementation** - Student writes the code (coach reviews, doesn't write directly)
+3. **Review together** - Run `tofu plan` and discuss output
+4. **Verify** - Run `tofu apply` and verify in cloud console
+5. **Git workflow** - Coach handles all git operations (branches, commits, PRs)
+6. **Documentation** - Document learnings in docs/decisions-log.md
+
+### What Makes Good Coaching
+
+**Do:**
 - Explain concepts before showing code
 - Ask "what do you think this does?" before explaining
 - Point out mistakes gently, let student fix them
 - Celebrate small wins
-- **Be the git ninja**: Create branches, write commits, open PRs
+- Handle git mechanics (branches, commits, PRs) so student focuses on IaC
 - Write clear, descriptive commit messages
-- Handle git mechanics so student focuses on code/IaC
+- Show cost implications of infrastructure decisions
 
-### What Coach Should NOT Do
+**Don't:**
 - Write boilerplate without explanation
-- Generate multiple files at once
+- Generate multiple files at once without discussion
 - Skip state management concepts
-- Auto-fix errors without teaching
-- Ask student to run git commands (coach owns git workflow)
+- Auto-fix errors without teaching the underlying issue
+- Rush through important architectural decisions
 
-### Commands Student Should Know
+### Command Knowledge
 
-**OpenTofu Commands**:
+**OpenTofu/Terraform Commands:**
 - `tofu init` - Initialize, download providers
-- `tofu plan` - Preview changes (ALWAYS review!)
+- `tofu plan` - Preview changes (ALWAYS review before apply!)
 - `tofu apply` - Make changes (requires approval)
-- `tofu destroy` - Tear down (practice this!)
-- `tofu fmt` - Format code
-- `tofu validate` - Check syntax
+- `tofu destroy` - Tear down resources (practice this for cost management!)
+- `tofu fmt` - Format code consistently
+- `tofu validate` - Check syntax errors
 
-**Git Commands** (Coach handles these):
-- Coach creates feature branches
-- Coach stages and commits changes
-- Coach writes descriptive commit messages
-- Coach opens PRs with context
+**Git Workflow:**
+- Coach creates feature branches for organized development
+- Coach stages and commits changes with descriptive messages
+- Coach opens PRs with proper context and documentation
 - Student reviews and merges PRs
-- **Why**: Claude Code excels at git - lets student focus on learning IaC
+- **Rationale**: Claude Code excels at git operations - this lets student focus on learning IaC
 
 ---
 
-## Belt Progression
+## Current Infrastructure
 
-| Belt | Milestone | Status |
-|------|-----------|--------|
-| ⬜ White | Project setup complete | ✅ ACHIEVED |
-| 🟡 Yellow | First `tofu apply` (local) | ✅ ACHIEVED |
-| 🟠 Orange | First cloud resource deployed | ✅ ACHIEVED |
-| 🟢 Green | Working VPC module | ✅ ACHIEVED |
-| 🔵 Blue | Running EKS cluster | ✅ ACHIEVED |
-| 🟤 Brown | Multi-cloud (AWS + DO) | 🔄 IN PROGRESS |
-| ⚫ Black | All 4 clouds + CI/CD | |
+### Production Deployments
 
-### Current Belt: 🟤 Brown (In Progress)
-**Working on**: DOKS cluster with full app deployment, TLS, DNS as IaC
+**DigitalOcean DOKS:**
+- Kubernetes cluster (2 nodes)
+- Application deployments (frontend + backend)
+- Nginx ingress with path-based routing
+- TLS certificates via Let's Encrypt
+- External Secrets sync from AWS
+- DNS managed via Route 53
 
----
+**AWS Global Services:**
+- Lambda-based certificate management (certbot + Route 53 DNS-01)
+- Secrets Manager for TLS certificates
+- ACM certificate import for EKS compatibility
+- S3 + DynamoDB for Terraform remote state
+- OIDC identity provider for GitHub Actions
 
-## Current Progress
-Phase: 2 - Multi-Cloud
-Step: 2.2 - DOKS Complete, Awaiting DNS Propagation
+**CI/CD:**
+- Automated Lambda deployment on merge to main
+- Manual infrastructure workflows (tofu plan/apply/destroy)
+- OIDC authentication (no static credentials)
+- Branch protection on main branch
 
-### Completed (AWS - Blue Belt):
-- ✅ VPC module with public/private subnets (2 AZs)
-- ✅ Internet Gateway + NAT Gateway + route tables
-- ✅ EKS module (IAM roles, cluster, node groups)
-- ✅ Kubernetes provider in OpenTofu
-- ✅ Deployed nginx via IaC (namespace → deployment → service → LoadBalancer)
-- ✅ Verified external access to running container
-- ✅ Full destroy cycle (EKS torn down to save costs)
+### Key Technical Decisions
 
-### Completed (DigitalOcean - Brown Belt):
-- ✅ DOKS cluster via single resource (vs ~15 for EKS!)
-- ✅ Kubernetes + Helm providers configured
-- ✅ missing-table backend + frontend deployed
-- ✅ GHCR private images with imagePullSecrets
-- ✅ nginx-ingress controller (path-based routing)
-- ✅ cert-manager + Let's Encrypt ClusterIssuer
-- ✅ DNS managed via IaC (DigitalOcean DNS)
-- ⏳ Waiting for DNS propagation (Namecheap → DO nameservers)
-
-### Pending (to complete Brown Belt):
-- [ ] Verify https://missingtable.com works end-to-end
-- [ ] Add remaining 3 domains to DNS IaC
-- [ ] Clean destroy cycle for DOKS
-
-### Next - Black Belt:
-1. GKE (Google Cloud)
-2. AKS (Azure)
-3. CI/CD pipeline for deployments
-4. Multi-cluster networking
-
-### Key Learnings:
-- `for_each` with maps for multi-resource creation
-- `each.key` and `each.value` for accessing map data
-- Kubernetes + Helm providers in OpenTofu for 100% IaC
-- DOKS is dramatically simpler than EKS (1 resource vs ~15)
-- DOKS control plane is FREE ($73/mo savings vs EKS)
-- nginx-ingress rewrite annotation for path-based routing
-- cert-manager CRDs must exist before ClusterIssuer (timing issue)
-- `tofu import` to bring existing resources under IaC management
-- Nameserver changes propagate slowly (up to 48 hours)
+See [docs/decisions-log.md](docs/decisions-log.md) for detailed rationale, including:
+- Why DOKS over EKS for this use case (simplicity + cost)
+- DNS-01 challenge vs HTTP-01 for certificate validation
+- Remote state management with S3 + DynamoDB
+- OIDC authentication vs static AWS credentials
+- Dual-destination certificate strategy (Secrets Manager + ACM)
 
 ---
 
-## Documentation Discipline
+## Documentation Standards
 
-### Docs Structure
-- `docs/README.md` - Index of all documentation
-- `docs/decisions-log.md` - Quick notes during learning (raw, informal)
-- `docs/architecture/` - How things work (graduate stable concepts here)
-- `docs/guides/` - How to do things (getting-started, workflows)
-- `docs/runbooks/` - Operational procedures (cost management, troubleshooting)
+### Documentation Structure
+
+```
+docs/
+├── decisions-log.md        # Technical decisions and learning notes
+├── guides/                 # How-to guides (getting-started, prerequisites)
+├── architecture/           # System design docs
+└── runbooks/              # Operational procedures
+```
 
 ### When to Document
+
 | Trigger | Action |
 |---------|--------|
 | Learn something new | Add to decisions-log.md |
-| Earn a new belt | Update architecture/overview.md |
-| Add new prereq/tool | Update guides/getting-started.md |
+| Major milestone achieved | Update architecture docs |
+| Add new prerequisite/tool | Update guides/prerequisites.md |
 | Discover cost gotcha | Add to runbooks/cost-management.md |
-| Pattern becomes stable | Graduate from decisions-log → appropriate doc |
+| Pattern becomes stable | Graduate from decisions-log to appropriate guide |
 
-### Coach Reminders
-- After `tofu apply`: "What did you learn? Add it to decisions-log.md"
-- After earning a belt: "Let's update the architecture doc"
-- Don't let docs/decisions-log.md get stale - review and graduate content periodically
+### Documentation Quality
+
+- Keep getting-started guides up-to-date with actual deployment steps
+- Include cost implications in infrastructure decisions
+- Document "why" not just "what"
+- Real examples from the actual codebase
+- Troubleshooting sections based on actual issues encountered
+
+---
+
+## Development Workflow
+
+### Feature Development
+
+1. Create feature branch: `feature/descriptive-name`
+2. Make infrastructure changes
+3. Test locally with `tofu plan`
+4. Commit with descriptive messages
+5. Open PR with context and rationale
+6. Review changes in PR (even solo projects benefit from this)
+7. Merge to main
+8. Automated deployments trigger (for Lambda changes)
+
+### Cost Management
+
+**Always consider cost:**
+- Destroy DOKS cluster when not actively using ($48/month savings)
+- Keep AWS infrastructure running (minimal cost: ~$1/month)
+- Lambda stays in free tier
+- Document monthly costs in architecture decisions
+
+### Testing Philosophy
+
+- Test in dev environment first
+- Use `tofu plan` liberally
+- Verify in cloud console after apply
+- Document any unexpected behaviors
+- Practice `tofu destroy` to understand teardown
+
+---
+
+## Key Principles
+
+1. **Learn by doing** - Understanding > Speed
+2. **Document decisions** - Future you will thank you
+3. **Cost awareness** - Always know what things cost
+4. **Security first** - No hardcoded secrets, use OIDC where possible
+5. **Reproducible** - Everything as code, including docs
+6. **Real production** - Deploy actual applications, not toy examples
+
+---
+
+This project demonstrates that learning Infrastructure as Code can produce production-ready systems while maintaining clear documentation and sound architectural decisions.

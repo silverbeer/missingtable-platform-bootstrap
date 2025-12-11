@@ -6,9 +6,8 @@ on:
       - 'clouds/aws/global/certificate-management/lambda/**'
       - '.github/workflows/lambda-certbot-deploy.yml'
     branches:
-      - main
-      - public-repo-prep
-  workflow_dispatch:
+      - main  # Only deploy when merged to main
+  workflow_dispatch:  # Allow manual deployment for emergencies
 
 jobs:
   deploy:

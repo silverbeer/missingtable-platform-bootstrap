@@ -120,7 +120,7 @@ spec {
     name = "ghcr-secret"
   }
   container {
-    image = "ghcr.io/silverbeer/missing-table-backend:latest"
+    image = "ghcr.io/${var.ghcr_username}/missing-table-backend:latest"
   }
 }
 ```

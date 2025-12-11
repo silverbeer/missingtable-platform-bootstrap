@@ -87,7 +87,7 @@ python test_local.py missingtable.com
 
 ┌─ Test Configuration ─────────────────────────┐
 │ Domain: missingtable.com                     │
-│ Email: silverbeer.io@gmail.com               │
+│ Email: youremailhere@email.com               │
 │ Dry Run: True                                │
 │ Check Only: False                            │
 └──────────────────────────────────────────────┘

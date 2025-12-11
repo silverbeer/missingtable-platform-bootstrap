@@ -16,6 +16,16 @@ def handler(event, context):
     email = os.environ["LETSENCRYPT_EMAIL"]
     secret_id = os.environ["SECRET_ID"]
     hosted_zone_id = os.environ["HOSTED_ZONE_ID"]
+    
+    # Get ACM region from event, environment variable, Lambda context, or default
+    acm_region = (
+        event.get("acm_region") or
+        event.get("region") or
+        os.environ.get("ACM_REGION") or
+        os.environ.get("AWS_REGION") or
+        (context.invoked_function_arn.split(":")[3] if context and hasattr(context, "invoked_function_arn") else None) or
+        "us-east-1"  # Default to us-east-1 for CloudFront/ALB compatibility
+    )
 
     # Create temp directory for certbot
     work_dir = tempfile.mkdtemp()
@@ -66,9 +76,31 @@ def handler(event, context):
             SecretString=secret_value
         )
 
+        # Also import to ACM for EKS Load Balancers
+        acm_client = boto3.client('acm', region_name=acm_region)
+
+        # Read the certificate chain for ACM
+        with open(os.path.join(cert_path, "chain.pem")) as f:
+            chain = f.read()
+
+        # Import certificate to ACM
+        response = acm_client.import_certificate(
+            Certificate=cert.encode(),
+            PrivateKey=key.encode(),
+            CertificateChain=chain.encode()
+        )
+
+        certificate_arn = response['CertificateArn']
+        print(f"Certificate imported to ACM in region {acm_region}: {certificate_arn}")
+
         return {
             "statusCode": 200,
-            "body": f"Certificate for {domain} renewed and stored"
+            "body": json.dumps({
+                "message": f"Certificate for {domain} renewed and stored",
+                "secrets_manager": secret_id,
+                "acm_arn": certificate_arn,
+                "acm_region": acm_region
+            })
         }
 
     finally:

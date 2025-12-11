@@ -113,6 +113,28 @@ resource "aws_iam_role_policy" "lambda_secrets" {
     })
 }
 
+resource "aws_iam_role_policy" "lambda_acm" {
+    name = "acm-import"
+    role = aws_iam_role.certbot_lambda.id
+    policy = jsonencode({
+        Version = "2012-10-17"
+        Statement = [
+            {
+                Effect = "Allow"
+                Action = [
+                    "acm:ImportCertificate",
+                    "acm:ListCertificates",
+                    "acm:DescribeCertificate",
+                    "acm:AddTagsToCertificate",
+                    "acm:RemoveTagsFromCertificate",
+                    "acm:ListTagsForCertificate"
+                ]
+                Resource = "*"
+            }
+        ]
+    })
+}
+
 resource "aws_lambda_function" "certbot" {
     function_name = "certbot-renewal"
     role = aws_iam_role.certbot_lambda.arn

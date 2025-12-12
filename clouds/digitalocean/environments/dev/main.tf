@@ -319,7 +319,7 @@ resource "helm_release" "grafana_k8s_monitoring" {
       namespaces = ["missing-table", "qualityplaybook", "monitoring"]
 
       # Drop noisy logs to save free tier quota
-      extraStageBlocks = <<-EOT
+      extraLogProcessingStages = <<-EOT
         // Drop health check logs
         stage.drop {
           source      = ""

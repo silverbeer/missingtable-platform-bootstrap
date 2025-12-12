@@ -75,7 +75,7 @@ resource "helm_release" "external_secrets" {
   }
 
   set {
-    name = "installCRDs"
+    name  = "installCRDs"
     value = true
   }
 
@@ -85,24 +85,24 @@ resource "helm_release" "external_secrets" {
 # AWS credentials for External Secrets to read from Secrets Manager
 resource "kubernetes_secret_v1" "aws_credentials" {
   metadata {
-    name = "aws-credentials"
+    name      = "aws-credentials"
     namespace = kubernetes_namespace_v1.external_secrets.metadata[0].name
   }
 
   data = {
-    access-key-id = var.aws_access_key_id
+    access-key-id     = var.aws_access_key_id
     secret-access-key = var.aws_secret_access_key
   }
 }
 
 resource "time_sleep" "wait_for_external_secrets" {
-    depends_on = [helm_release.external_secrets]
-    create_duration = "30s"
+  depends_on      = [helm_release.external_secrets]
+  create_duration = "30s"
 }
 
 # ClusterSecretStore - cluster-wide access to AWS Secrets Manager
 resource "kubectl_manifest" "aws_secret_store" {
-    yaml_body = <<YAML
+  yaml_body = <<YAML
       apiVersion: external-secrets.io/v1beta1
       kind: ClusterSecretStore
       metadata:
@@ -124,14 +124,14 @@ resource "kubectl_manifest" "aws_secret_store" {
                   key: secret-access-key                
     YAML
 
-    depends_on = [time_sleep.wait_for_external_secrets, kubernetes_secret_v1.aws_credentials]
+  depends_on = [time_sleep.wait_for_external_secrets, kubernetes_secret_v1.aws_credentials]
 }
 
 # =============================================================================
 # EXTERNAL SECRET - Sync TLS certificate from AWS to K8s
 # =============================================================================
 resource "kubectl_manifest" "tls_external_secret" {
-    yaml_body = <<YAML
+  yaml_body = <<YAML
       apiVersion: external-secrets.io/v1beta1
       kind: ExternalSecret
       metadata:
@@ -160,14 +160,14 @@ resource "kubectl_manifest" "tls_external_secret" {
               property: private_key
     YAML
 
-    depends_on = [kubectl_manifest.aws_secret_store]
+  depends_on = [kubectl_manifest.aws_secret_store]
 }
 
 # =============================================================================
 # EXTERNAL SECRET - Sync qualityplaybook.dev TLS certificate
 # =============================================================================
 resource "kubectl_manifest" "qualityplaybook_tls_external_secret" {
-    yaml_body = <<YAML
+  yaml_body = <<YAML
       apiVersion: external-secrets.io/v1beta1
       kind: ExternalSecret
       metadata:
@@ -196,13 +196,13 @@ resource "kubectl_manifest" "qualityplaybook_tls_external_secret" {
               property: private_key
     YAML
 
-    depends_on = [kubectl_manifest.aws_secret_store]
+  depends_on = [kubectl_manifest.aws_secret_store]
 }
 
-resource "kubernetes_namespace_v1" "qualityplaybook" {    
-    metadata {
-      name = "qualityplaybook"
-    }
-
-    depends_on = [digitalocean_kubernetes_cluster.main]
+resource "kubernetes_namespace_v1" "qualityplaybook" {
+  metadata {
+    name = "qualityplaybook"
   }
+
+  depends_on = [digitalocean_kubernetes_cluster.main]
+}

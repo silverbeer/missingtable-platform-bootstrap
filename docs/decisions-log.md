@@ -298,6 +298,44 @@ modules/
 
 ---
 
+## AWS Resource Tagging Strategy
+
+**Date**: December 2024
+
+**Problem**: AWS resources had inconsistent tagging - only 47% coverage, mix of `Name`-only tags and inconsistent casing (`Environment` vs `environment`). This made cost tracking impossible in AWS Cost Explorer.
+
+**Decision**: Implement a mandatory 5-tag schema for all AWS resources:
+
+| Tag Key | Purpose | Example |
+|---------|---------|---------|
+| `name` | Resource identifier | `missing-table-vpc` |
+| `project` | Cost allocation by project | `missing-table` |
+| `environment` | Cost allocation by env | `dev`, `prod`, `global` |
+| `managed_by` | Ownership/tooling | `terraform` |
+| `cost_center` | Business unit billing | `engineering` |
+
+**Implementation Pattern**:
+- Modules accept a `tags` variable and use `merge(var.tags, { name = "..." })`
+- Root modules define `locals { common_tags = {...} }` and pass to child modules
+- All tag keys are lowercase (consistent with AWS best practices)
+
+**Resources Updated**:
+- VPC module: 8 resources (VPC, subnets, IGW, NAT, EIP, route tables)
+- EKS module: 4 resources (cluster, node group, IAM roles)
+- Certificate-management: 12 resources (Route53, Lambda, ECR, Secrets Manager, CloudWatch)
+- Terraform-state: 2 resources (S3, DynamoDB)
+
+**Why This Matters**:
+- NAT Gateway alone costs ~$32-45/month - need visibility into which project/env is using it
+- Enables filtering by `project` and `environment` in AWS Cost Explorer
+- Establishes pattern for future resources and environments
+
+**Issues Fixed**:
+- `Nmae` typo in terraform-state S3 bucket → `name`
+- Mixed casing (`Environment` vs `environment`) → all lowercase
+
+---
+
 ## Concepts
 
 ### Variables & Outputs

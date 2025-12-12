@@ -159,12 +159,13 @@ docs/
 ## Key Principles
 
 1. **100% Infrastructure as Code** - ALL infrastructure changes MUST be made via IaC (Terraform/OpenTofu, Helm). Never make manual changes via CLI (`aws`, `kubectl`, `gcloud`) without codifying them. If you fix something manually, immediately update the IaC to match.
-2. **Learn by doing** - Understanding > Speed
-3. **Document decisions** - Future you will thank you
-4. **Cost awareness** - Always know what things cost
-5. **Security first** - No hardcoded secrets, use OIDC where possible
-6. **Reproducible** - Everything as code, including docs
-7. **Real production** - Deploy actual applications, not toy examples
+2. **Consistent Resource Tagging** - ALL AWS resources MUST have the required tags for cost tracking and organization.
+3. **Learn by doing** - Understanding > Speed
+4. **Document decisions** - Future you will thank you
+5. **Cost awareness** - Always know what things cost
+6. **Security first** - No hardcoded secrets, use OIDC where possible
+7. **Reproducible** - Everything as code, including docs
+8. **Real production** - Deploy actual applications, not toy examples
 
 ### The 100% IaC Rule
 
@@ -183,6 +184,55 @@ docs/
 4. Commit and push the IaC changes
 
 **Never leave manual changes uncodified** - they will be lost on next `tofu apply` or `helm upgrade`.
+
+### Resource Tagging Standard
+
+**REQUIRED**: All AWS resources that support tags MUST include these tags:
+
+| Tag Key | Required | Description | Example |
+|---------|----------|-------------|---------|
+| `name` | Yes | Resource identifier | `missing-table-vpc` |
+| `project` | Yes | Project name for cost allocation | `missing-table` |
+| `environment` | Yes | Deployment environment | `dev`, `prod`, `global` |
+| `managed_by` | Yes | Tool managing the resource | `terraform` |
+| `cost_center` | Yes | Business unit for billing | `engineering` |
+
+**Implementation Pattern**:
+
+For modules (VPC, EKS), accept a `tags` variable and merge with resource-specific tags:
+```hcl
+variable "tags" {
+  description = "Common tags to apply to all resources"
+  type        = map(string)
+  default     = {}
+}
+
+resource "aws_vpc" "main" {
+  # ...
+  tags = merge(var.tags, {
+    name = var.vpc_name
+  })
+}
+```
+
+For root modules (environments), define common tags as a local:
+```hcl
+locals {
+  common_tags = {
+    project     = "missing-table"
+    environment = "dev"
+    managed_by  = "terraform"
+    cost_center = "engineering"
+  }
+}
+
+module "vpc" {
+  # ...
+  tags = local.common_tags
+}
+```
+
+**Tag key casing**: Always use lowercase (e.g., `environment`, not `Environment`).
 
 ---
 

@@ -19,6 +19,7 @@ on:
         type: choice
         options:
           - digitalocean
+          - aws
       environment:
         description: Environment to deploy to
         required: true

@@ -234,6 +234,49 @@ module "vpc" {
 
 **Tag key casing**: Always use lowercase (e.g., `environment`, not `Environment`).
 
+### Terraform File Structure
+
+Each environment MUST follow this file structure for clarity and separation of concerns:
+
+```
+clouds/<provider>/environments/<env>/
+├── backend.tf    # Remote state configuration (S3 + DynamoDB)
+├── versions.tf   # required_version + required_providers
+├── providers.tf  # Provider configurations
+├── main.tf       # Resources and modules
+├── variables.tf  # Input variables
+└── outputs.tf    # Output values
+```
+
+**File responsibilities:**
+
+| File | Purpose |
+|------|---------|
+| `backend.tf` | Remote state only - makes it obvious state is remote |
+| `versions.tf` | Terraform version constraints and provider versions |
+| `providers.tf` | Provider configuration (regions, auth, etc.) |
+| `main.tf` | Resources, modules, locals |
+| `variables.tf` | Input variable definitions |
+| `outputs.tf` | Output value definitions |
+
+**Example `backend.tf`:**
+```hcl
+terraform {
+  backend "s3" {
+    bucket         = "missingtable-terraform-state"
+    key            = "aws/environments/dev/terraform.tfstate"
+    region         = "us-east-2"
+    dynamodb_table = "terraform-state-lock"
+    encrypt        = true
+  }
+}
+```
+
+**Why this matters:**
+- Glancing at the file list tells you if state is remote (`backend.tf` exists)
+- Easy to compare configurations across environments
+- Standard convention in the Terraform community
+
 ---
 
 This project demonstrates that learning Infrastructure as Code can produce production-ready systems while maintaining clear documentation and sound architectural decisions.

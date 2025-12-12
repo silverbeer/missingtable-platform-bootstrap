@@ -206,3 +206,128 @@ resource "kubernetes_namespace_v1" "qualityplaybook" {
 
   depends_on = [digitalocean_kubernetes_cluster.main]
 }
+
+# =============================================================================
+# MONITORING - Grafana Cloud Observability
+# =============================================================================
+
+resource "kubernetes_namespace_v1" "monitoring" {
+  metadata {
+    name = "monitoring"
+  }
+
+  depends_on = [digitalocean_kubernetes_cluster.main]
+}
+
+# Sync Grafana Cloud credentials from AWS Secrets Manager
+resource "kubectl_manifest" "grafana_cloud_external_secret" {
+  yaml_body = <<YAML
+apiVersion: external-secrets.io/v1beta1
+kind: ExternalSecret
+metadata:
+  name: grafana-cloud-credentials
+  namespace: monitoring
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    name: aws-secrets-manager
+    kind: ClusterSecretStore
+  target:
+    name: grafana-cloud-credentials
+  data:
+    - secretKey: prometheus-host
+      remoteRef:
+        key: grafana-cloud-credentials
+        property: prometheus_endpoint
+    - secretKey: prometheus-username
+      remoteRef:
+        key: grafana-cloud-credentials
+        property: prometheus_username
+    - secretKey: loki-host
+      remoteRef:
+        key: grafana-cloud-credentials
+        property: loki_endpoint
+    - secretKey: loki-username
+      remoteRef:
+        key: grafana-cloud-credentials
+        property: loki_username
+    - secretKey: access-token
+      remoteRef:
+        key: grafana-cloud-credentials
+        property: access_token
+YAML
+
+  depends_on = [
+    kubectl_manifest.aws_secret_store,
+    kubernetes_namespace_v1.monitoring
+  ]
+}
+
+# =============================================================================
+# GRAFANA KUBERNETES MONITORING
+# Deploys: Grafana Alloy, kube-state-metrics, node-exporter
+# Sends metrics and logs to Grafana Cloud
+# =============================================================================
+
+resource "helm_release" "grafana_k8s_monitoring" {
+  name       = "grafana-k8s-monitoring"
+  repository = "https://grafana.github.io/helm-charts"
+  chart      = "k8s-monitoring"
+  namespace  = kubernetes_namespace_v1.monitoring.metadata[0].name
+  version    = "2.0.6"
+
+  depends_on = [kubectl_manifest.grafana_cloud_external_secret]
+
+  # Using yamlencode() for type-safe YAML generation
+  # Avoids issues like numbers being parsed as scientific notation
+  values = [yamlencode({
+    cluster = {
+      name = "missingtable-dev"
+    }
+
+    # Destinations - where to send telemetry
+    destinations = [
+      {
+        name = "prometheus"
+        type = "prometheus"
+        url  = var.grafana_cloud_prometheus_url
+        auth = {
+          type     = "basic"
+          username = var.grafana_cloud_prometheus_username
+          password = var.grafana_cloud_access_token
+        }
+      },
+      {
+        name = "loki"
+        type = "loki"
+        url  = var.grafana_cloud_loki_url
+        auth = {
+          type     = "basic"
+          username = var.grafana_cloud_loki_username
+          password = var.grafana_cloud_access_token
+        }
+      }
+    ]
+
+    # Metrics collection
+    clusterMetrics = { enabled = true }
+    nodeMetrics    = { enabled = true }
+
+    # Log collection - only from our app namespaces
+    podLogs = {
+      enabled    = true
+      namespaces = ["missing-table", "qualityplaybook", "monitoring"]
+    }
+
+    # Cluster events (pod restarts, etc.)
+    clusterEvents = { enabled = true }
+
+    # Disable traces for now (defer for later)
+    applicationObservability = { enabled = false }
+
+    # Enable Alloy collectors
+    alloy-metrics   = { enabled = true }
+    alloy-logs      = { enabled = true }
+    alloy-singleton = { enabled = true }
+  })]
+}

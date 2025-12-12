@@ -52,3 +52,33 @@ variable "aws_secret_access_key" {
   type        = string
   sensitive   = true
 }
+
+# =============================================================================
+# GRAFANA CLOUD
+# =============================================================================
+
+variable "grafana_cloud_prometheus_url" {
+  description = "Grafana Cloud Prometheus remote write URL"
+  type        = string
+}
+
+variable "grafana_cloud_prometheus_username" {
+  description = "Grafana Cloud Prometheus username (numeric ID)"
+  type        = string
+}
+
+variable "grafana_cloud_loki_url" {
+  description = "Grafana Cloud Loki push URL"
+  type        = string
+}
+
+variable "grafana_cloud_loki_username" {
+  description = "Grafana Cloud Loki username (numeric ID)"
+  type        = string
+}
+
+variable "grafana_cloud_access_token" {
+  description = "Grafana Cloud API access token"
+  type        = string
+  sensitive   = true
+}

@@ -25,6 +25,20 @@ resource "aws_secretsmanager_secret" "tls-cert" {
   })
 }
 
+# =============================================================================
+# GRAFANA CLOUD CREDENTIALS - for Kubernetes monitoring
+# =============================================================================
+
+resource "aws_secretsmanager_secret" "grafana_cloud" {
+  name        = "grafana-cloud-credentials"
+  description = "Grafana Cloud API credentials for Kubernetes monitoring"
+
+  tags = merge(local.common_tags, {
+    name    = "grafana-cloud-credentials"
+    purpose = "Observability for DOKS cluster"
+  })
+}
+
 resource "aws_iam_user" "external_secrets" {
   name = "external-secrets-${var.domain_name}"
 
@@ -41,9 +55,13 @@ resource "aws_iam_user_policy" "external_secrets" {
     Version = "2012-10-17"
     Statement = [
       {
-        Action   = "secretsmanager:GetSecretValue"
-        Effect   = "Allow"
-        Resource = aws_secretsmanager_secret.tls-cert.arn
+        Action = "secretsmanager:GetSecretValue"
+        Effect = "Allow"
+        Resource = [
+          aws_secretsmanager_secret.tls-cert.arn,
+          aws_secretsmanager_secret.qualityplaybook_tls.arn,
+          aws_secretsmanager_secret.grafana_cloud.arn
+        ]
       }
     ]
   })

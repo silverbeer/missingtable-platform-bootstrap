@@ -67,6 +67,12 @@ jobs:
           echo "TF_VAR_ghcr_token=${{ secrets.TF_VAR_GHCR_TOKEN }}" >> $GITHUB_ENV
           echo "TF_VAR_aws_access_key_id=${{ secrets.TF_VAR_AWS_ACCESS_KEY_ID }}" >> $GITHUB_ENV
           echo "TF_VAR_aws_secret_access_key=${{ secrets.TF_VAR_AWS_SECRET_ACCESS_KEY }}" >> $GITHUB_ENV
+          # Grafana Cloud observability
+          echo "TF_VAR_grafana_cloud_prometheus_url=${{ secrets.TF_VAR_GRAFANA_CLOUD_PROMETHEUS_URL }}" >> $GITHUB_ENV
+          echo "TF_VAR_grafana_cloud_prometheus_username=${{ secrets.TF_VAR_GRAFANA_CLOUD_PROMETHEUS_USERNAME }}" >> $GITHUB_ENV
+          echo "TF_VAR_grafana_cloud_loki_url=${{ secrets.TF_VAR_GRAFANA_CLOUD_LOKI_URL }}" >> $GITHUB_ENV
+          echo "TF_VAR_grafana_cloud_loki_username=${{ secrets.TF_VAR_GRAFANA_CLOUD_LOKI_USERNAME }}" >> $GITHUB_ENV
+          echo "TF_VAR_grafana_cloud_access_token=${{ secrets.TF_VAR_GRAFANA_CLOUD_ACCESS_TOKEN }}" >> $GITHUB_ENV
 
       - name: Initialize OpenTofu
         run: tofu init

@@ -336,6 +336,64 @@ modules/
 
 ---
 
+## Grafana Cloud Observability
+
+**Date**: December 2024
+
+**Problem**: DOKS cluster had zero observability - no metrics, no logs, no visibility into what's running.
+
+**Decision**: Use Grafana Cloud (free tier) with the Grafana k8s-monitoring Helm chart v2.
+
+**Why Grafana Cloud**:
+- Free tier: 10k metrics series, 50GB logs/month - sufficient for dev
+- Managed service - no need to run Prometheus/Loki in-cluster
+- Unified platform for metrics, logs, and traces (future)
+
+**Why k8s-monitoring Helm Chart**:
+- Deploys Grafana Alloy (the collector), kube-state-metrics, and node-exporter in one chart
+- Grafana Agent reached EOL November 2025 - Alloy is the future
+- OpenTelemetry-native for future tracing support
+
+**Implementation**:
+| Component | Purpose |
+|-----------|---------|
+| AWS Secrets Manager | Store Grafana Cloud credentials |
+| ExternalSecret | Sync credentials to K8s |
+| k8s-monitoring Helm | Deploy Alloy + collectors |
+
+**Gotchas Encountered**:
+
+1. **YAML number parsing** - Username `2293577` was parsed as scientific notation `2.293577e+06`. Fix: quote the username in YAML.
+
+2. **Chart v2 validation** - Required explicitly enabling alloy components:
+   ```yaml
+   alloy-metrics:
+     enabled: true
+   alloy-logs:
+     enabled: true
+   alloy-singleton:
+     enabled: true
+   ```
+
+3. **Prometheus URL** - Must include `/push` suffix for remote write endpoint.
+
+**Cost Impact**: $0/month (free tier)
+
+**What's Collected**:
+- Cluster metrics (kube-state-metrics)
+- Node metrics (node-exporter)
+- Pod logs from `missing-table`, `qualityplaybook`, `monitoring` namespaces
+- Cluster events
+
+**Free Tier Usage** (estimated):
+| Resource | Limit | Usage |
+|----------|-------|-------|
+| Metrics | 10k series | ~2-3k |
+| Logs | 50GB/month | ~5-10GB |
+| Retention | 30 days | Sufficient |
+
+---
+
 ## Concepts
 
 ### Variables & Outputs

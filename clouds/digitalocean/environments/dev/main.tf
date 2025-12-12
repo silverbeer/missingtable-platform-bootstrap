@@ -317,6 +317,37 @@ resource "helm_release" "grafana_k8s_monitoring" {
     podLogs = {
       enabled    = true
       namespaces = ["missing-table", "qualityplaybook", "monitoring"]
+
+      # Drop noisy logs to save free tier quota
+      extraStageBlocks = <<-EOT
+        // Drop health check logs
+        stage.drop {
+          source      = ""
+          expression  = ".*GET /health.*"
+          drop_counter_reason = "health_check"
+        }
+        stage.drop {
+          source      = ""
+          expression  = ".*GET /healthz.*"
+          drop_counter_reason = "health_check"
+        }
+        stage.drop {
+          source      = ""
+          expression  = ".*GET /ready.*"
+          drop_counter_reason = "readiness_probe"
+        }
+        stage.drop {
+          source      = ""
+          expression  = ".*GET /livez.*"
+          drop_counter_reason = "liveness_probe"
+        }
+        // Drop debug level logs
+        stage.drop {
+          source      = ""
+          expression  = ".*level=debug.*"
+          drop_counter_reason = "debug_logs"
+        }
+      EOT
     }
 
     # Cluster events (pod restarts, etc.)

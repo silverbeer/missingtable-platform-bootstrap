@@ -1,4 +1,5 @@
 name: K8s Infra Pipeline
+run-name: "${{ inputs.command }} ${{ inputs.cloud }}/${{ inputs.environment }}"
 
 on:
   workflow_dispatch:

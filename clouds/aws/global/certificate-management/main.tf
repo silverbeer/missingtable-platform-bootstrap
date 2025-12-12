@@ -329,3 +329,11 @@ resource "aws_route53_record" "missingtable_www" {
   ttl     = 300
   records = ["137.184.242.213"]
 }
+
+resource "aws_route53_record" "argocd" {
+  zone_id = aws_route53_zone.main.zone_id
+  name    = "argocd.${var.domain_name}"
+  type    = "A"
+  ttl     = 300
+  records = ["137.184.242.213"]
+}

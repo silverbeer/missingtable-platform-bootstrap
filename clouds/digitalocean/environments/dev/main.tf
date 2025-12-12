@@ -362,3 +362,161 @@ resource "helm_release" "grafana_k8s_monitoring" {
     alloy-singleton = { enabled = true }
   })]
 }
+
+# =============================================================================
+# ARGOCD - GitOps Continuous Delivery
+# =============================================================================
+
+resource "kubernetes_namespace_v1" "argocd" {
+  metadata {
+    name = "argocd"
+  }
+
+  depends_on = [digitalocean_kubernetes_cluster.main]
+}
+
+resource "helm_release" "argocd" {
+  name       = "argocd"
+  repository = "https://argoproj.github.io/argo-helm"
+  chart      = "argo-cd"
+  namespace  = kubernetes_namespace_v1.argocd.metadata[0].name
+  version    = "7.7.5"
+
+  # Server configuration for ingress
+  set {
+    name  = "server.insecure"
+    value = "true"
+  }
+
+  set {
+    name  = "configs.params.server\\.insecure"
+    value = "true"
+  }
+
+  depends_on = [kubernetes_namespace_v1.argocd]
+}
+
+# Ingress for ArgoCD UI
+resource "kubectl_manifest" "argocd_ingress" {
+  yaml_body = <<YAML
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: argocd-server-ingress
+  namespace: argocd
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
+spec:
+  ingressClassName: nginx
+  tls:
+  - hosts:
+    - argocd.missingtable.com
+    secretName: argocd-tls
+  rules:
+  - host: argocd.missingtable.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: argocd-server
+            port:
+              number: 80
+YAML
+
+  depends_on = [helm_release.argocd]
+}
+
+# ExternalSecret for ArgoCD TLS certificate
+resource "kubectl_manifest" "argocd_tls_external_secret" {
+  yaml_body = <<YAML
+apiVersion: external-secrets.io/v1beta1
+kind: ExternalSecret
+metadata:
+  name: argocd-tls
+  namespace: argocd
+spec:
+  refreshInterval: 24h
+  secretStoreRef:
+    name: aws-secrets-manager
+    kind: ClusterSecretStore
+  target:
+    name: argocd-tls
+    template:
+      type: kubernetes.io/tls
+      data:
+        tls.crt: "{{ .cert }}"
+        tls.key: "{{ .key }}"
+  data:
+    - secretKey: cert
+      remoteRef:
+        key: missingtable.com-tls
+        property: fullchain
+    - secretKey: key
+      remoteRef:
+        key: missingtable.com-tls
+        property: private_key
+YAML
+
+  depends_on = [helm_release.argocd, kubectl_manifest.aws_secret_store]
+}
+
+# =============================================================================
+# ARGOCD APPLICATIONS
+# =============================================================================
+
+resource "kubectl_manifest" "argocd_app_missing_table" {
+  yaml_body = <<YAML
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: missing-table
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/silverbeer/missing-table
+    targetRevision: main
+    path: helm/missing-table
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: missing-table
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+YAML
+
+  depends_on = [helm_release.argocd]
+}
+
+resource "kubectl_manifest" "argocd_app_qualityplaybook" {
+  yaml_body = <<YAML
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: qualityplaybook
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/silverbeer/qualityplaybook.dev
+    targetRevision: main
+    path: helm/qualityplaybook
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: qualityplaybook
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+YAML
+
+  depends_on = [helm_release.argocd]
+}

@@ -274,3 +274,24 @@ resource "aws_route53_record" "qualityplaybook_www" {
     ttl     = 300
     records = ["137.184.242.213"]
 }
+
+# =============================================================================
+# MISSINGTABLE.COM - DNS A Records
+# =============================================================================
+
+# DNS A record for missingtable.com pointing to DOKS ingress
+resource "aws_route53_record" "missingtable_root" {
+    zone_id = aws_route53_zone.main.zone_id
+    name    = var.domain_name
+    type    = "A"
+    ttl     = 300
+    records = ["137.184.242.213"]
+}
+
+resource "aws_route53_record" "missingtable_www" {
+    zone_id = aws_route53_zone.main.zone_id
+    name    = "www.${var.domain_name}"
+    type    = "A"
+    ttl     = 300
+    records = ["137.184.242.213"]
+}

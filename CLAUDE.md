@@ -158,12 +158,31 @@ docs/
 
 ## Key Principles
 
-1. **Learn by doing** - Understanding > Speed
-2. **Document decisions** - Future you will thank you
-3. **Cost awareness** - Always know what things cost
-4. **Security first** - No hardcoded secrets, use OIDC where possible
-5. **Reproducible** - Everything as code, including docs
-6. **Real production** - Deploy actual applications, not toy examples
+1. **100% Infrastructure as Code** - ALL infrastructure changes MUST be made via IaC (Terraform/OpenTofu, Helm). Never make manual changes via CLI (`aws`, `kubectl`, `gcloud`) without codifying them. If you fix something manually, immediately update the IaC to match.
+2. **Learn by doing** - Understanding > Speed
+3. **Document decisions** - Future you will thank you
+4. **Cost awareness** - Always know what things cost
+5. **Security first** - No hardcoded secrets, use OIDC where possible
+6. **Reproducible** - Everything as code, including docs
+7. **Real production** - Deploy actual applications, not toy examples
+
+### The 100% IaC Rule
+
+**CRITICAL**: This project maintains a strict 100% Infrastructure as Code policy.
+
+**What this means:**
+- DNS records → Terraform (Route 53 in `clouds/aws/global/certificate-management/`)
+- Kubernetes resources → Helm charts (in `missing-table` repo)
+- Cloud infrastructure → Terraform/OpenTofu
+- Secrets → External Secrets Operator + AWS Secrets Manager
+
+**If you make a manual fix:**
+1. Fix the immediate issue (acceptable in emergencies)
+2. IMMEDIATELY update the corresponding IaC
+3. Apply the IaC to verify it matches the manual change
+4. Commit and push the IaC changes
+
+**Never leave manual changes uncodified** - they will be lost on next `tofu apply` or `helm upgrade`.
 
 ---
 

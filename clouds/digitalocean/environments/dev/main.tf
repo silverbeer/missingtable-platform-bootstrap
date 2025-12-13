@@ -558,6 +558,9 @@ spec:
     repoURL: https://github.com/silverbeer/missing-table
     targetRevision: main
     path: helm/missing-table
+    helm:
+      valueFiles:
+        - values-doks.yaml
   destination:
     server: https://kubernetes.default.svc
     namespace: missing-table

@@ -39,6 +39,16 @@ resource "aws_secretsmanager_secret" "grafana_cloud" {
   })
 }
 
+resource "aws_secretsmanager_secret" "missing_table_app" {
+  name        = "missing-table-app-secrets"
+  description = "Application secrets for Missing Table (Supabase, database credentials)"
+
+  tags = merge(local.common_tags, {
+    name    = "missing-table-app-secrets"
+    purpose = "Application credentials for Missing Table app"
+  })
+}
+
 resource "aws_iam_user" "external_secrets" {
   name = "external-secrets-${var.domain_name}"
 
@@ -60,7 +70,8 @@ resource "aws_iam_user_policy" "external_secrets" {
         Resource = [
           aws_secretsmanager_secret.tls-cert.arn,
           aws_secretsmanager_secret.qualityplaybook_tls.arn,
-          aws_secretsmanager_secret.grafana_cloud.arn
+          aws_secretsmanager_secret.grafana_cloud.arn,
+          aws_secretsmanager_secret.missing_table_app.arn
         ]
       }
     ]

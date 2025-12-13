@@ -35,6 +35,7 @@ def handler(event, context):
 
     try:
         # Run certbot with Route 53 DNS plugin
+        # Include wildcard subdomain for services like argocd.domain.com
         cmd = [
             "certbot", "certonly",
             "--non-interactive",
@@ -42,6 +43,7 @@ def handler(event, context):
             "--email", email,
             "--dns-route53",
             "--domains", domain,
+            "--domains", f"*.{domain}",
             "--config-dir", config_dir,
             "--work-dir", work_path,
             "--logs-dir", logs_dir,

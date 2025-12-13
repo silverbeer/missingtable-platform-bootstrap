@@ -164,6 +164,84 @@ resource "kubectl_manifest" "tls_external_secret" {
 }
 
 # =============================================================================
+# EXTERNAL SECRET - Sync Missing Table app secrets (Supabase, database)
+# =============================================================================
+resource "kubectl_manifest" "missing_table_app_external_secret" {
+  yaml_body = <<YAML
+apiVersion: external-secrets.io/v1beta1
+kind: ExternalSecret
+metadata:
+  name: missing-table-app-secrets
+  namespace: missing-table
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    name: aws-secrets-manager
+    kind: ClusterSecretStore
+  target:
+    name: missing-table-secrets
+  data:
+    - secretKey: database-url
+      remoteRef:
+        key: missing-table-app-secrets
+        property: database_url
+    - secretKey: supabase-url
+      remoteRef:
+        key: missing-table-app-secrets
+        property: supabase_url
+    - secretKey: supabase-anon-key
+      remoteRef:
+        key: missing-table-app-secrets
+        property: supabase_anon_key
+    - secretKey: supabase-service-key
+      remoteRef:
+        key: missing-table-app-secrets
+        property: supabase_service_key
+    - secretKey: supabase-jwt-secret
+      remoteRef:
+        key: missing-table-app-secrets
+        property: supabase_jwt_secret
+    - secretKey: service-account-secret
+      remoteRef:
+        key: missing-table-app-secrets
+        property: service_account_secret
+YAML
+
+  depends_on = [kubectl_manifest.aws_secret_store]
+}
+
+# =============================================================================
+# EXTERNAL SECRET - GHCR Image Pull Credentials for missing-table
+# =============================================================================
+resource "kubectl_manifest" "missing_table_ghcr_external_secret" {
+  yaml_body = <<YAML
+apiVersion: external-secrets.io/v1beta1
+kind: ExternalSecret
+metadata:
+  name: missing-table-ghcr
+  namespace: missing-table
+spec:
+  refreshInterval: 24h
+  secretStoreRef:
+    name: aws-secrets-manager
+    kind: ClusterSecretStore
+  target:
+    name: missing-table-ghcr
+    template:
+      type: kubernetes.io/dockerconfigjson
+      data:
+        .dockerconfigjson: '{"auths":{"ghcr.io":{"username":"silverbeer","password":"{{ .ghcr_pat }}","auth":"{{ printf "silverbeer:%s" .ghcr_pat | b64enc }}"}}}'
+  data:
+    - secretKey: ghcr_pat
+      remoteRef:
+        key: missing-table-app-secrets
+        property: ghcr_pat
+YAML
+
+  depends_on = [kubectl_manifest.aws_secret_store]
+}
+
+# =============================================================================
 # EXTERNAL SECRET - Sync qualityplaybook.dev TLS certificate
 # =============================================================================
 resource "kubectl_manifest" "qualityplaybook_tls_external_secret" {

@@ -1,0 +1,3 @@
+# Copy this to terraform.tfvars and fill in your values
+ssh_public_key   = "ssh-ed25519 AAAA... your-key-comment"
+allowed_ssh_cidr = "YOUR.PUBLIC.IP.HERE/32"  # Get your IP: curl https://checkip.amazonaws.com

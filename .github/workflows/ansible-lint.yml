@@ -1,0 +1,39 @@
+name: Ansible Lint
+
+on:
+  push:
+    paths:
+      - 'clouds/aws/environments/ansible-lab/ansible/**'
+      - '.github/workflows/ansible-lint.yml'
+    branches:
+      - main
+      - 'feature/**'
+  pull_request:
+    paths:
+      - 'clouds/aws/environments/ansible-lab/ansible/**'
+  workflow_dispatch:  # Manual trigger
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Install Ansible and ansible-lint
+        run: |
+          uv tool install ansible-lint --with ansible
+
+      - name: Display versions
+        run: |
+          ansible --version
+          ansible-lint --version
+
+      - name: Run ansible-lint
+        working-directory: clouds/aws/environments/ansible-lab/ansible
+        run: |
+          ansible-lint playbooks/

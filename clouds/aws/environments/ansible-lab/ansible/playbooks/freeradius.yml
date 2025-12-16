@@ -1,0 +1,16 @@
+---
+- name: Configure FreeRADIUS Server
+  hosts: radius-server
+  become: true
+
+  vars:
+    radius_localhost_secret: "testing123"
+    radius_users:
+      - name: testuser
+        password: testpass
+      - name: alice
+        password: wonderland
+    radius_clients: []
+
+  roles:
+    - freeradius

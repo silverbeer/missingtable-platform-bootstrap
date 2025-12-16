@@ -1,0 +1,15 @@
+# FreeRADIUS clients configuration - Managed by Ansible
+# Do not edit manually - changes will be overwritten
+
+# Localhost is always allowed (for testing with radtest)
+client localhost {
+    ipaddr = 127.0.0.1
+    secret = {{ radius_localhost_secret }}
+}
+
+{% for client in radius_clients %}
+client {{ client.name }} {
+    ipaddr = {{ client.ipaddr }}
+    secret = {{ client.secret }}
+}
+{% endfor %}

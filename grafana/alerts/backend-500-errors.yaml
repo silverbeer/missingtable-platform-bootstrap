@@ -1,0 +1,33 @@
+# Backend 500 Errors Alert
+# Fires when any 5xx errors are returned by the backend API
+
+name: Backend 500 Errors
+description: Backend API returned server errors
+service: backend
+severity: critical
+
+# PromQL query to evaluate
+query:
+  # Count of 5xx errors in the time window
+  expr: sum(increase(http_requests_total{namespace="missing-table", status=~"5.."}[5m])) or vector(0)
+  # Time range to look back (seconds)
+  range_seconds: 300
+
+# Alert condition
+condition:
+  # Alert if value is greater than threshold
+  operator: gt
+  threshold: 0
+
+# How long condition must be true before firing (0s = immediate)
+pending_duration: 0s
+
+# Behavior when query returns no data or errors
+no_data_state: OK
+error_state: Alerting
+
+# Notification settings
+notifications:
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h

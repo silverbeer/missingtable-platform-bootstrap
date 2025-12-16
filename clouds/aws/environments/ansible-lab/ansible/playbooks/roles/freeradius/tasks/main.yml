@@ -1,0 +1,32 @@
+---
+# tasks/main.yml - FreeRadius role tasks
+
+- name: Update apt cache
+  ansible.builtin.apt:
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Install FreeRadius packages
+  ansible.builtin.apt:
+    name:
+      - freeradius
+      - freeradius-utils
+    state: present
+
+- name: Configure test users
+  ansible.builtin.template:
+    src: users.j2
+    dest: /etc/freeradius/3.0/mods-config/files/authorize
+    owner: freerad
+    group: freerad
+    mode: "0640"
+  notify: Restart FreeRADIUS
+
+- name: Configure RADIUS clients
+  ansible.builtin.template:
+    src: clients.conf.j2
+    dest: /etc/freeradius/3.0/clients.conf
+    owner: freerad
+    group: freerad
+    mode: "0640"
+  notify: Restart FreeRADIUS

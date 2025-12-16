@@ -391,6 +391,13 @@ resource "helm_release" "grafana_k8s_monitoring" {
     clusterMetrics = { enabled = true }
     nodeMetrics    = { enabled = true }
 
+    # Scrape application metrics from pods with prometheus annotations
+    # Pods need: prometheus.io/scrape: "true", prometheus.io/port: "8000", prometheus.io/path: "/metrics"
+    annotationAutodiscovery = {
+      enabled = true
+      namespaces = ["missing-table", "qualityplaybook"]
+    }
+
     # Log collection - only from our app namespaces
     podLogs = {
       enabled    = true
@@ -439,6 +446,56 @@ resource "helm_release" "grafana_k8s_monitoring" {
     alloy-logs      = { enabled = true }
     alloy-singleton = { enabled = true }
   })]
+}
+
+# =============================================================================
+# GRAFANA DASHBOARDS - Modular Dashboard Definitions
+# =============================================================================
+# Dashboards are defined in JSON files at: grafana/dashboards/*.json
+# Add a new JSON file and run tofu apply to deploy new dashboards.
+# =============================================================================
+
+module "grafana_dashboards" {
+  source = "../../../../modules/grafana-dashboards"
+
+  providers = {
+    grafana = grafana
+  }
+
+  dashboards_path = "${path.module}/../../../../grafana/dashboards"
+  folder_title    = "Missing Table"
+}
+
+# =============================================================================
+# GRAFANA ALERTING - Modular Alert Definitions
+# =============================================================================
+# Alerts are defined in YAML files at: grafana/alerts/*.yaml
+# Add a new YAML file and run tofu apply to deploy new alerts.
+# =============================================================================
+
+# Email contact point for alerts
+resource "grafana_contact_point" "backend_email" {
+  name = "Backend Alerts Email"
+
+  email {
+    addresses               = [var.alert_email]
+    single_email            = true
+    message                 = "{{ len .Alerts.Firing }} alert(s) firing:\n\n{{ range .Alerts.Firing }}{{ .Annotations.summary }}\n{{ .Annotations.description }}\n\n{{ end }}"
+    disable_resolve_message = false
+  }
+}
+
+# Deploy all alerts from YAML definitions
+module "grafana_alerts" {
+  source = "../../../../modules/grafana-alerts"
+
+  providers = {
+    grafana = grafana
+  }
+
+  alerts_path   = "${path.module}/../../../../grafana/alerts"
+  folder_title  = "Missing Table Alerts"
+  contact_point = grafana_contact_point.backend_email.name
 }
 
 # =============================================================================

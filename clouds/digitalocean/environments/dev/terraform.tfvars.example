@@ -1,0 +1,48 @@
+# Copy this file to terraform.tfvars and fill in your values
+# terraform.tfvars is gitignored and will be auto-loaded by tofu
+
+# =============================================================================
+# SUPABASE
+# =============================================================================
+database_url       = ""
+supabase_url       = ""
+supabase_anon_key  = ""
+supabase_jwt_secret = ""
+
+# =============================================================================
+# CERTIFICATES
+# =============================================================================
+letsencrypt_email = ""
+
+# =============================================================================
+# GITHUB CONTAINER REGISTRY
+# =============================================================================
+ghcr_username = ""
+ghcr_token    = ""
+
+# =============================================================================
+# DIGITALOCEAN
+# =============================================================================
+digitalocean_token = ""
+
+# =============================================================================
+# AWS (for External Secrets)
+# =============================================================================
+aws_access_key_id     = ""
+aws_secret_access_key = ""
+
+# =============================================================================
+# GRAFANA CLOUD
+# =============================================================================
+grafana_cloud_prometheus_url      = "https://prometheus-prod-XX-prod-us-east-X.grafana.net/api/prom/push"
+grafana_cloud_prometheus_username = ""
+grafana_cloud_loki_url            = "https://logs-prod-XXX.grafana.net/loki/api/v1/push"
+grafana_cloud_loki_username       = ""
+grafana_cloud_access_token        = ""
+
+# Dashboard and alerting management (create a service account in Grafana Cloud with Editor role)
+grafana_cloud_stack_url                 = "https://yourstack.grafana.net"
+grafana_cloud_service_account_token     = ""
+
+# Alert notifications
+alert_email                             = "your-email@example.com"

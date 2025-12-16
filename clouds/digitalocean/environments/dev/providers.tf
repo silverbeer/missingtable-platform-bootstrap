@@ -28,3 +28,9 @@ provider "kubectl" {
   )
   load_config_file = false
 }
+
+# Grafana Cloud provider for dashboard and alerting management
+provider "grafana" {
+  url  = var.grafana_cloud_stack_url
+  auth = var.grafana_cloud_service_account_token
+}

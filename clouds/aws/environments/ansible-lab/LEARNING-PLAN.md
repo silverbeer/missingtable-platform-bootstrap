@@ -14,17 +14,28 @@ Green belt in Ansible - solid fundamentals for job interview prep.
 - [x] First playbook created (`ansible/playbooks/freeradius.yml`)
 - [x] FreeRADIUS packages installed on server
 
-### In Progress
-- [ ] **Lesson 4: Configuring FreeRADIUS** - paused here
-  - Create role structure (`playbooks/roles/freeradius/`)
-  - Create tasks/main.yml
-  - Create templates (users.j2, clients.conf.j2)
-  - Create handlers (restart service)
+### Completed
+- [x] **Lesson 4: Configuring FreeRADIUS**
+  - Created role structure (`playbooks/roles/freeradius/`)
+  - Created tasks/main.yml (install + configure)
+  - Created templates (users.j2, clients.conf.j2) with Jinja2 loops
+  - Created handlers (restart service on config change)
+  - Learned: FreeRADIUS 3.x reads from `mods-config/files/authorize`
+- [x] **Lesson 5: Test with radtest**
+  - Verified testuser and alice authenticate successfully
+  - Verified wrong passwords get rejected
+- [x] **Lesson 6: GitHub Actions workflow for Ansible**
+  - Created `.github/workflows/ansible-lint.yml`
+  - Uses `uv` for Python package management
+  - Runs ansible-lint on push, PR, and manual trigger
+  - Fixed YAML formatting issues to pass linting
+- [x] **Lesson 7: End-to-end test (destroy/recreate/deploy)**
+  - Destroyed all 8 resources with `tofu destroy`
+  - Recreated infrastructure with `tofu apply`
+  - Ran Ansible playbook on fresh server
+  - Verified FreeRADIUS authentication works
 
-### Remaining
-- [ ] Lesson 5: Test with radtest
-- [ ] Lesson 6: GitHub Actions workflow for Ansible
-- [ ] Lesson 7: End-to-end test (destroy/recreate/deploy)
+### All lessons complete!
 
 ---
 
@@ -32,8 +43,8 @@ Green belt in Ansible - solid fundamentals for job interview prep.
 
 ### EC2 Instance
 ```
-IP: 3.14.253.164
-SSH: ssh -i ~/.ssh/ansible-lab ubuntu@3.14.253.164
+IP: 18.119.17.172
+SSH: ssh -i ~/.ssh/ansible-lab ubuntu@18.119.17.172
 ```
 
 ### Commands Learned

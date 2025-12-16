@@ -82,3 +82,19 @@ variable "grafana_cloud_access_token" {
   type        = string
   sensitive   = true
 }
+
+variable "grafana_cloud_stack_url" {
+  description = "Grafana Cloud stack URL (e.g., https://yourstack.grafana.net)"
+  type        = string
+}
+
+variable "grafana_cloud_service_account_token" {
+  description = "Grafana Cloud service account token with dashboard write permissions"
+  type        = string
+  sensitive   = true
+}
+
+variable "alert_email" {
+  description = "Email address for alert notifications"
+  type        = string
+}

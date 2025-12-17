@@ -13,7 +13,6 @@ variable "vpc_cidr_block" {
 variable "vpc_availability_zones" {
   description = "Availability Zones for the VPC"
   type        = list(string)
-  default     = ["us-east-2a", "us-east-2b"]
 }
 
 variable "environment" {
@@ -23,12 +22,8 @@ variable "environment" {
 }
 
 variable "public_subnet_cidr_block" {
-  description = "CIDR block for the public subnet"
+  description = "CIDR blocks for public subnets, keyed by availability zone"
   type        = map(string)
-  default = {
-    "us-east-2a" = "10.0.1.0/24"
-    "us-east-2b" = "10.0.2.0/24"
-  }
 }
 
 variable "public_subnet_name" {
@@ -38,12 +33,8 @@ variable "public_subnet_name" {
 }
 
 variable "private_subnet_cidr_block" {
-  description = "CIDR block for the private subnet"
+  description = "CIDR blocks for private subnets, keyed by availability zone"
   type        = map(string)
-  default = {
-    "us-east-2a" = "10.0.10.0/24"
-    "us-east-2b" = "10.0.11.0/24"
-  }
 }
 
 variable "private_subnet_name" {

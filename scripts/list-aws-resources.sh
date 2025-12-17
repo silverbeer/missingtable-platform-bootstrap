@@ -364,6 +364,56 @@ if $SHOW_COSTS; then
     fi
 
     echo ""
+
+    # Show estimated infrastructure costs based on detected resources
+    echo -e "${BOLD}${CYAN}Estimated Monthly Infrastructure Costs${NC}"
+    echo -e "${BLUE}──────────────────────────────────────────────────────────────────────────${NC}"
+    ESTIMATED_TOTAL=0
+
+    # Check for EKS cluster
+    if echo "$ALL_RESOURCES" | grep -q ":eks:.*:cluster/"; then
+        echo -e "   EKS Control Plane                       ${YELLOW}~\$72.00${NC}"
+        ESTIMATED_TOTAL=$((ESTIMATED_TOTAL + 72))
+    fi
+
+    # Check for NAT Gateway
+    if echo "$ALL_RESOURCES" | grep -q ":natgateway/"; then
+        echo -e "   NAT Gateway (+ data transfer)           ${YELLOW}~\$32.00${NC}"
+        ESTIMATED_TOTAL=$((ESTIMATED_TOTAL + 32))
+    fi
+
+    # Check for Load Balancers
+    ALB_COUNT=$(echo "$ALL_RESOURCES" | grep -c ":elasticloadbalancing:" 2>/dev/null || echo "0")
+    ALB_COUNT=${ALB_COUNT//[^0-9]/}  # Remove non-numeric characters
+    ALB_COUNT=${ALB_COUNT:-0}
+    if [ "$ALB_COUNT" -gt 0 ]; then
+        ALB_COST=$((ALB_COUNT * 16))
+        echo -e "   Load Balancer(s) x${ALB_COUNT}                      ${YELLOW}~\$${ALB_COST}.00${NC}"
+        ESTIMATED_TOTAL=$((ESTIMATED_TOTAL + ALB_COST))
+    fi
+
+    # Check for Route53 hosted zones
+    ZONE_COUNT=$(echo "$ALL_RESOURCES" | grep -c ":route53:.*:hostedzone/" 2>/dev/null || echo "0")
+    ZONE_COUNT=${ZONE_COUNT//[^0-9]/}
+    ZONE_COUNT=${ZONE_COUNT:-0}
+    if [ "$ZONE_COUNT" -gt 0 ]; then
+        ZONE_COST=$(awk "BEGIN {printf \"%.2f\", $ZONE_COUNT * 0.50}")
+        echo -e "   Route 53 Hosted Zone(s) x${ZONE_COUNT}              ${YELLOW}~\$${ZONE_COST}${NC}"
+    fi
+
+    # Check for Secrets Manager
+    SECRET_COUNT=$(echo "$ALL_RESOURCES" | grep -c ":secretsmanager:" 2>/dev/null || echo "0")
+    SECRET_COUNT=${SECRET_COUNT//[^0-9]/}
+    SECRET_COUNT=${SECRET_COUNT:-0}
+    if [ "$SECRET_COUNT" -gt 0 ]; then
+        SECRET_COST=$(awk "BEGIN {printf \"%.2f\", $SECRET_COUNT * 0.40}")
+        echo -e "   Secrets Manager x${SECRET_COUNT}                     ${YELLOW}~\$${SECRET_COST}${NC}"
+    fi
+
+    echo ""
+    echo -e "   ${BOLD}Estimated Total:                         ~\$${ESTIMATED_TOTAL}.00+/month${NC}"
+    echo -e "   ${GRAY}(excludes EC2 instances, data transfer, and storage)${NC}"
+    echo ""
 fi
 
 # Show helpful commands

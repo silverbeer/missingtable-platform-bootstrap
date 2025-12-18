@@ -1,0 +1,64 @@
+---
+# Task to download and run the uv installer and verify it's installed
+
+- name: Install uv
+  hosts: radius-server
+  become: false # No need to become root for this task
+
+  tasks:
+    # Bootstrap: ensure Python3 is installed for custom modules
+    - name: Ensure Python3 is installed
+      become: true
+      ansible.builtin.apt:
+        name: python3
+        state: present
+        update_cache: true
+
+    - name: Download and run the uv installer
+      ansible.builtin.shell: curl -LsSf https://astral.sh/uv/install.sh | sh
+      args:
+        creates: ~/.local/bin/uv
+
+    - name: Check if uv is installed
+      ansible.builtin.stat:
+        path: ~/.local/bin/uv
+      register: uv_binary
+
+    - name: Show uv status
+      ansible.builtin.debug:
+        msg: "UV is installed: {{ uv_binary.stat.exists }}"
+    
+    - name: Verify uv is installed
+      ansible.builtin.shell: 
+      # need to put ~/.local/bin/uv in the path
+        ~/.local/bin/uv --version
+
+    - name: Verify uv is in ~/.local/bin/uv and is executable
+      ansible.builtin.shell: 
+        test -x ~/.local/bin/uv
+
+    - name: Install python 3.12
+      uv_python:
+        version: "3.12"
+
+    - name: Install python 3.13
+      uv_python:
+        version: "3.13"
+
+    - name: Create venv for python 3.12
+      become: true
+      uv_venv:
+        python_version: "3.12"
+        path: /opt/python3.12
+        dependencies:
+          - boto3
+          - requests
+
+    - name: Set up S3 file check cron
+      become: true
+      s3_file_cron:
+        bucket: "my-test-bucket"
+        key: "health-check/marker.txt"
+        schedule: "*/5 * * * *"
+        log_file: /var/log/s3-file-check.log
+        state: present

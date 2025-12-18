@@ -1,6 +1,6 @@
 #!/bin/bash
 # EC2 Start/Stop script for ansible-lab
-# Usage: ./ec2-control.sh [start|stop|status]
+# Usage: ./ec2-control.sh [start|stop|status|update-inventory]
 
 set -e
 
@@ -49,8 +49,21 @@ case "${1:-status}" in
         echo "State:    $STATE"
         [ "$IP" != "None" ] && echo "IP:       $IP"
         ;;
+    update-inventory)
+        IP=$(aws ec2 describe-instances --instance-ids "$INSTANCE_ID" --region "$REGION" \
+            --query 'Reservations[0].Instances[0].PublicIpAddress' --output text)
+
+        if [ "$IP" = "None" ] || [ -z "$IP" ]; then
+            echo "Error: Instance has no public IP. Is it running?"
+            exit 1
+        fi
+
+        sed -i.bak "s/ansible_host: .*/ansible_host: $IP/" "$INVENTORY_FILE"
+        rm -f "${INVENTORY_FILE}.bak"
+        echo "Updated $INVENTORY_FILE with IP: $IP"
+        ;;
     *)
-        echo "Usage: $0 [start|stop|status]"
+        echo "Usage: $0 [start|stop|status|update-inventory]"
         exit 1
         ;;
 esac

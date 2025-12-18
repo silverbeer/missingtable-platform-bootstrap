@@ -1,0 +1,74 @@
+---
+# POC playbook demonstrating custom Ansible modules
+# Tests: uv_python and s3_file_cron modules
+
+- name: Custom Module POC
+  hosts: radius-server
+  become: false
+
+  vars:
+    python_versions:
+      - "3.12"
+      - "3.13"
+    s3_bucket: "my-test-bucket"
+    s3_key: "health-check/marker.txt"
+
+  tasks:
+    # First, ensure uv is installed (from uv-setup.yml)
+    - name: Ensure uv is installed
+      ansible.builtin.shell: ~/.local/bin/uv --version
+      register: uv_check
+      changed_when: false
+      failed_when: uv_check.rc != 0
+
+    - name: Show uv version
+      ansible.builtin.debug:
+        var: uv_check.stdout
+
+    # Test uv_python module - install Python versions
+    - name: Install Python versions via uv
+      uv_python:
+        version: "{{ item }}"
+      loop: "{{ python_versions }}"
+      register: python_install
+
+    - name: Show Python install results
+      ansible.builtin.debug:
+        msg: "{{ item.msg }}"
+      loop: "{{ python_install.results }}"
+
+    # Verify Python versions are available
+    - name: List installed Python versions
+      ansible.builtin.shell: ~/.local/bin/uv python list
+      register: python_list
+      changed_when: false
+
+    - name: Show installed Python versions
+      ansible.builtin.debug:
+        var: python_list.stdout_lines
+
+    # Test s3_file_cron module (requires become for /etc/cron.d)
+    - name: Set up S3 file check cron job
+      become: true
+      s3_file_cron:
+        bucket: "{{ s3_bucket }}"
+        key: "{{ s3_key }}"
+        schedule: "*/10 * * * *"
+        log_file: /var/log/s3-file-check.log
+        state: present
+      register: cron_result
+
+    - name: Show cron setup result
+      ansible.builtin.debug:
+        var: cron_result
+
+    # Verify cron was created
+    - name: Check cron file exists
+      become: true
+      ansible.builtin.stat:
+        path: "{{ cron_result.cron_file }}"
+      register: cron_stat
+
+    - name: Show cron file status
+      ansible.builtin.debug:
+        msg: "Cron file exists: {{ cron_stat.stat.exists }}"

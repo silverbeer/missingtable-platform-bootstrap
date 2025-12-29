@@ -22,3 +22,8 @@ output "ami_id" {
   description = "AMI ID used for the instance"
   value       = data.aws_ami.ubuntu.id
 }
+
+output "s3_bucket_name" {
+  description = "S3 bucket for RADIUS server config"
+  value       = aws_s3_bucket.radius_server_config.id
+}

@@ -47,3 +47,4 @@ resource "aws_security_group" "radius_server" {
     name = "ansible-lab-radius-sg"
   })
 }
+

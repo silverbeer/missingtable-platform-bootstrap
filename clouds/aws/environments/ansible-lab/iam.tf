@@ -57,3 +57,4 @@ resource "aws_iam_instance_profile" "radius_server" {
     name = "ansible-lab-radius-server-profile"
   })
 }
+

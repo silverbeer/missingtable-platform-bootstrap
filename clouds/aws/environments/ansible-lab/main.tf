@@ -1,4 +1,4 @@
-locals {
+ locals {
   common_tags = {
     project     = "ansible-lab"
     environment = "dev"
@@ -59,56 +59,6 @@ resource "aws_route_table_association" "public" {
 }
 
 # =============================================================================
-# SECURITY GROUP - SSH + RADIUS ports
-# =============================================================================
-
-resource "aws_security_group" "radius_server" {
-  name        = "ansible-lab-radius-server"
-  description = "Security group for FreeRADIUS learning lab"
-  vpc_id      = aws_vpc.main.id
-
-  # SSH access from your IP only
-  ingress {
-    description = "SSH from allowed IP"
-    from_port   = 22
-    to_port     = 22
-    protocol    = "tcp"
-    cidr_blocks = [var.allowed_ssh_cidr]
-  }
-
-  # RADIUS Authentication (for testing with radtest)
-  ingress {
-    description = "RADIUS Authentication"
-    from_port   = 1812
-    to_port     = 1812
-    protocol    = "udp"
-    cidr_blocks = [var.allowed_ssh_cidr]
-  }
-
-  # RADIUS Accounting
-  ingress {
-    description = "RADIUS Accounting"
-    from_port   = 1813
-    to_port     = 1813
-    protocol    = "udp"
-    cidr_blocks = [var.allowed_ssh_cidr]
-  }
-
-  # Allow all outbound (for package installation)
-  egress {
-    description = "Allow all outbound"
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  tags = merge(local.common_tags, {
-    name = "ansible-lab-radius-sg"
-  })
-}
-
-# =============================================================================
 # SSH KEY PAIR
 # =============================================================================
 
@@ -147,6 +97,7 @@ resource "aws_instance" "radius_server" {
   vpc_security_group_ids      = [aws_security_group.radius_server.id]
   subnet_id                   = aws_subnet.public.id
   associate_public_ip_address = true
+  iam_instance_profile        = aws_iam_instance_profile.radius_server.name
 
   root_block_device {
     volume_size = 20

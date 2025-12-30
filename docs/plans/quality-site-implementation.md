@@ -90,11 +90,13 @@ quality.missingtable.com/
 | 1.4 | S3 bucket policy | ✅ Done | `aws_s3_bucket_policy.quality_site_policy` |
 | 1.5 | ACM certificate | ✅ Done | `aws_acm_certificate.quality_site_cert` (us-east-1) |
 | 1.6 | Route53 validation | ✅ Done | `aws_route53_record.quality_site_cert_validation` |
-| 1.7 | ACM validation | 🔄 Next | `aws_acm_certificate_validation` - wait for validation |
-| 1.8 | CloudFront distribution | ⬜ Pending | `aws_cloudfront_distribution` |
-| 1.9 | Route53 alias | ⬜ Pending | `aws_route53_record` (alias to CloudFront) |
-| 1.10 | S3 lifecycle rule | ⬜ Pending | `aws_s3_bucket_lifecycle_configuration` |
-| 1.11 | Upload placeholder | ⬜ Pending | `aws_s3_object` (index.html) |
+| 1.7 | ACM validation | ✅ Done | `aws_acm_certificate_validation.quality_site_cert_validation` |
+| 1.8 | CloudFront distribution | ✅ Done | `aws_cloudfront_distribution.quality_site_cdn` |
+| 1.9 | Route53 alias | ✅ Done | `aws_route53_record.quality_site_dns` |
+| 1.10 | S3 lifecycle rule | ✅ Done | `aws_s3_bucket_lifecycle_configuration.quality_site_lifecycle` |
+| 1.11 | Upload placeholder | ✅ Done | `aws_s3_object.index_html` |
+
+**Phase 1 Complete!** Site live at https://quality.missingtable.com
 
 **Outputs:**
 - `quality_site_bucket_name`

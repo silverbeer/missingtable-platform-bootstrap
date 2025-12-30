@@ -113,7 +113,9 @@ quality.missingtable.com/
 
 ### Phase 2: Self-Hosted GitHub Runner (This Repo)
 
-**Goal:** EC2 instance registered as GitHub Actions runner
+**Goal:** EC2 instance ready for Ansible configuration
+
+**Cost Warning:** Phase 2 creates an EC2 instance (~$15/mo). Destroy when not in use!
 
 | Step | Resource | You Write | I Coach |
 |------|----------|-----------|---------|
@@ -122,21 +124,24 @@ quality.missingtable.com/
 | 2.3 | Public Subnet | `aws_subnet` | Why public (no NAT = $0) |
 | 2.4 | Route Table | `aws_route_table` + association | 0.0.0.0/0 → IGW |
 | 2.5 | Security Group | `aws_security_group` | SSH only, egress all |
-| 2.6 | IAM Role | `aws_iam_role` | EC2 assume role policy |
-| 2.7 | IAM Policy | `aws_iam_role_policy` | S3 write, CloudFront invalidate |
-| 2.8 | Instance Profile | `aws_iam_instance_profile` | Attach role to EC2 |
-| 2.9 | Key Pair | `aws_key_pair` | For Ansible SSH access |
-| 2.10 | EC2 Instance | `aws_instance` | Ubuntu 24.04, t3.small |
+| 2.6 | Secrets Manager | `aws_secretsmanager_secret` | For GitHub runner token |
+| 2.7 | IAM Role | `aws_iam_role` | EC2 assume role policy |
+| 2.8 | IAM Policy | `aws_iam_role_policy` | S3 write, CloudFront invalidate, Secrets read |
+| 2.9 | Instance Profile | `aws_iam_instance_profile` | Attach role to EC2 |
+| 2.10 | Key Pair | `aws_key_pair` | For Ansible SSH access |
+| 2.11 | EC2 Instance | `aws_instance` | Ubuntu 24.04, t3.small |
 
 **Outputs:**
 - `runner_instance_id`
 - `runner_public_ip`
 - `runner_ssh_command`
+- `runner_token_secret_arn`
 
 **Verification:**
 - [ ] `tofu apply` succeeds
 - [ ] Can SSH to instance
 - [ ] Instance has internet access (can `apt update`)
+- [ ] **REMINDER: Destroy EC2 when done testing Phase 2!**
 
 ---
 
@@ -213,21 +218,63 @@ ansible/
 
 ---
 
-## Cost Estimate
+## Cost Management (IMPORTANT)
 
-| Resource | Monthly Cost | Notes |
-|----------|--------------|-------|
-| S3 | ~$0.50 | <1GB storage, minimal requests |
-| CloudFront | ~$1.00 | Low traffic, free tier helps |
-| Route53 | $0.50 | Hosted zone |
-| ACM | Free | Certificates are free |
-| EC2 t3.small | ~$15.00 | 2 vCPU, 2GB RAM |
-| **Total** | **~$17/month** | Can stop EC2 when not in use |
+### Cost Breakdown
 
-**Cost optimization:**
-- EC2 can be stopped when not running tests
-- Consider scheduled start/stop if predictable usage
-- Spot instances possible but adds complexity
+| Resource | Monthly Cost | Free Tier? | Notes |
+|----------|--------------|------------|-------|
+| S3 | ~$0.02 | YES (5GB) | <1GB storage, minimal requests |
+| CloudFront | ~$0.00 | YES (1TB/mo) | Low traffic, well within free tier |
+| Route53 | $0.50 | NO | Hosted zone fee (unavoidable) |
+| ACM | Free | YES | Certificates are always free |
+| Secrets Manager | ~$0.40 | NO | $0.40/secret/month + API calls |
+| **Phase 1 Total** | **~$1/month** | | Static site only |
+| EC2 t3.small | ~$15/month | NO | **Only when running** |
+| **With EC2 running** | **~$16/month** | | |
+
+### EC2 Cost Control
+
+**The EC2 instance is the primary cost driver.** It should be OFF by default.
+
+```bash
+# Spin UP the runner (when you need to run tests)
+cd /path/to/clouds/aws/global/quality-site
+tofu apply -target=aws_instance.github_runner
+
+# Spin DOWN the runner (when done - DO THIS!)
+tofu apply -target=aws_instance.github_runner -var="runner_enabled=false"
+# OR destroy just the instance:
+tofu destroy -target=aws_instance.github_runner
+```
+
+**Alternative: AWS CLI stop/start (preserves instance, ~$1.50/mo for EBS)**
+```bash
+# Stop (keeps EBS volume, stops compute charges)
+aws ec2 stop-instances --instance-ids <instance-id> --region us-east-2
+
+# Start (when ready to use)
+aws ec2 start-instances --instance-ids <instance-id> --region us-east-2
+```
+
+### Cost Checkpoints
+
+I will remind you at these points:
+- [ ] After Phase 1 apply: "Phase 1 complete. Monthly cost: ~$1. No EC2 yet."
+- [ ] After Phase 2 apply: "EC2 is now running (~$15/mo). Destroy when done testing."
+- [ ] After any test run: "Tests complete. Remember to stop/destroy the EC2 instance."
+
+### What's Safe to Leave Running
+
+| Resource | Safe to Leave? | Why |
+|----------|----------------|-----|
+| S3 bucket | YES | Pennies, free tier covers it |
+| CloudFront | YES | Free tier, no minimum |
+| Route53 | YES | $0.50/mo fixed, can't avoid |
+| ACM cert | YES | Free |
+| Secrets Manager | YES | $0.40/mo, negligible |
+| **EC2 instance** | **NO** | **$15/mo - destroy when not in use** |
+| VPC/Subnet/IGW | YES | Free (no NAT Gateway) |
 
 ---
 
@@ -235,9 +282,10 @@ ansible/
 
 1. **S3 Bucket:** Private, only accessible via CloudFront OAC
 2. **EC2 Security Group:** SSH restricted to your IP only
-3. **IAM Role:** Least privilege - only S3 write to quality bucket
-4. **GitHub Runner Token:** Stored in Secrets Manager or passed via user data
-5. **SSH Key:** Generated fresh, stored securely
+3. **IAM Role:** Least privilege - only S3 write to quality bucket + CloudFront invalidate
+4. **GitHub Runner Token:** Stored in AWS Secrets Manager, retrieved by Ansible at configure time
+5. **SSH Key:** Generated fresh for this project (`~/.ssh/quality-runner`)
+6. **Secrets Manager Access:** EC2 IAM role includes `secretsmanager:GetSecretValue` for runner token only
 
 ---
 
@@ -254,12 +302,15 @@ ansible/
 
 ---
 
-## Open Questions
+## Decisions Made
 
-1. **Runner token management:** Store in AWS Secrets Manager? Pass at apply time?
-2. **Runner labels:** What labels should the runner have? (`self-hosted`, `ubuntu`, `quality-runner`?)
-3. **Concurrency:** Single runner okay for now? (Can add more later)
-4. **Runner scope:** Repo-level or org-level runner?
+| Question | Decision |
+|----------|----------|
+| Runner token management | AWS Secrets Manager |
+| Runner labels | `self-hosted`, `linux`, `x64`, `quality-runner` |
+| Concurrency | Single runner (can scale later) |
+| Runner scope | Repo-level (`missing-table` only) |
+| EC2 lifecycle | **Off by default** - spin up only when running tests |
 
 ---
 

@@ -82,19 +82,21 @@ quality.missingtable.com/
 
 **Goal:** `quality.missingtable.com` serves a placeholder page
 
-| Step | Resource | You Write | I Coach |
-|------|----------|-----------|---------|
-| 1.1 | S3 bucket | `aws_s3_bucket` | Bucket naming, private by default |
-| 1.2 | S3 public access block | `aws_s3_bucket_public_access_block` | Why we block everything |
-| 1.3 | CloudFront OAC | `aws_cloudfront_origin_access_control` | OAC vs OAI (legacy) |
-| 1.4 | S3 bucket policy | `aws_s3_bucket_policy` | Allow CloudFront only |
-| 1.5 | ACM certificate | `aws_acm_certificate` | Why us-east-1 for CloudFront |
-| 1.6 | Route53 validation | `aws_route53_record` | DNS validation records |
-| 1.7 | ACM validation | `aws_acm_certificate_validation` | Wait for validation |
-| 1.8 | CloudFront distribution | `aws_cloudfront_distribution` | Origins, behaviors, cache |
-| 1.9 | Route53 alias | `aws_route53_record` | Alias to CloudFront |
-| 1.10 | S3 lifecycle rule | `aws_s3_bucket_lifecycle_configuration` | Delete runs/* after 30 days |
-| 1.11 | Upload placeholder | `aws_s3_object` | index.html with "Coming Soon" |
+| Step | Resource | Status | Notes |
+|------|----------|--------|-------|
+| 1.1 | S3 bucket | ✅ Done | `aws_s3_bucket.quality_site` |
+| 1.2 | S3 public access block | ✅ Done | `aws_s3_bucket_public_access_block.quality_site_public_block` |
+| 1.3 | CloudFront OAC | ✅ Done | `aws_cloudfront_origin_access_control.quality_site_cdn_oac` |
+| 1.4 | S3 bucket policy | ✅ Done | `aws_s3_bucket_policy.quality_site_policy` |
+| 1.5 | ACM certificate | ✅ Done | `aws_acm_certificate.quality_site_cert` (us-east-1) |
+| 1.6 | Route53 validation | ✅ Done | `aws_route53_record.quality_site_cert_validation` |
+| 1.7 | ACM validation | ✅ Done | `aws_acm_certificate_validation.quality_site_cert_validation` |
+| 1.8 | CloudFront distribution | ✅ Done | `aws_cloudfront_distribution.quality_site_cdn` |
+| 1.9 | Route53 alias | ✅ Done | `aws_route53_record.quality_site_dns` |
+| 1.10 | S3 lifecycle rule | ✅ Done | `aws_s3_bucket_lifecycle_configuration.quality_site_lifecycle` |
+| 1.11 | Upload placeholder | ✅ Done | `aws_s3_object.index_html` |
+
+**Phase 1 Complete!** Site live at https://quality.missingtable.com
 
 **Outputs:**
 - `quality_site_bucket_name`

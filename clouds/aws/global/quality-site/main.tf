@@ -55,6 +55,7 @@ resource "aws_s3_bucket_policy" "quality_site_policy" {
         Condition = {
           StringEquals = {
             "AWS:SourceAccount" = data.aws_caller_identity.current.account_id
+            "AWS:SourceArn"     = aws_cloudfront_distribution.quality_site_cdn.arn
           }
         }
       }

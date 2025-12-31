@@ -76,6 +76,12 @@ This is a learning-focused repository where code quality and understanding matte
 - S3 + DynamoDB for Terraform remote state
 - OIDC identity provider for GitHub Actions
 
+**Quality Site (quality.missingtable.com):**
+- S3 + CloudFront static site for test reports
+- Self-hosted GitHub Actions runner (EC2, off by default)
+- Managed via `./scripts/quality-runner.sh`
+- See `clouds/aws/global/quality-site/`
+
 **CI/CD:**
 - Automated Lambda deployment on merge to main
 - Manual infrastructure workflows (tofu plan/apply/destroy)
@@ -145,6 +151,31 @@ docs/
 - Keep AWS infrastructure running (minimal cost: ~$1/month)
 - Lambda stays in free tier
 - Document monthly costs in architecture decisions
+
+### Quality Site Runner (IMPORTANT)
+
+**The GitHub Actions runner in `clouds/aws/global/quality-site/` costs ~$15/month when running.**
+
+This runner is for **learning purposes only** - not for running lots of tests.
+
+**Before ending any session involving quality-site:**
+```bash
+./scripts/quality-runner.sh status  # Check if runner is on
+./scripts/quality-runner.sh down    # Shut it down if running
+```
+
+**Claude: Always remind the user to shut down the runner when:**
+- Finishing work on quality-site infrastructure
+- Ending a session where the runner was started
+- Before creating a PR that involved the runner
+
+**Safe to leave running (minimal cost):**
+- S3 bucket, CloudFront, ACM cert, Route53 (~$1/mo total)
+- VPC, subnet, security group, IAM (free)
+- Secrets Manager (~$0.40/mo)
+
+**Must shut down when not in use:**
+- EC2 runner instance (~$15/mo)
 
 ### Testing Philosophy
 

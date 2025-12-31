@@ -44,7 +44,7 @@
     update_cache: yes
 
 - name: Add ubuntu user to docker group
-  user: 
+  user:
     name: ubuntu
     groups: docker
     append: yes
@@ -148,7 +148,7 @@
 - name: Install AWS CLI v2
   command: /tmp/aws/install
   when: aws_cli_check.rc != 0
- 
+
 - name: Get runner token from Secrets Manager
   command: >
     aws secretsmanager get-secret-value
@@ -167,7 +167,7 @@
   no_log: true
 
 # ==============================
-# Systemd Service Configuration 
+# Systemd Service Configuration
 # ==============================
 
 - name: Install systemd service

@@ -221,3 +221,210 @@ resource "aws_route53_record" "quality_site_dns" {
         evaluate_target_health = false
     }
 }
+
+# =============================================================================
+# GITHUB RUNNER - EC2 instance for self-hosted Actions runner
+# Cost: ~$15/mo when running. Use runner_enabled=false to destroy.
+# =============================================================================
+resource "aws_vpc" "runner" {
+  cidr_block           = "10.100.0.0/16"
+  enable_dns_hostnames = true
+  enable_dns_support   = true
+
+  tags = merge(local.common_tags, {
+    name = "quality-site-runner-vpc"
+  })
+}
+
+resource "aws_internet_gateway" "runner" {
+  vpc_id = aws_vpc.runner.id
+
+  tags = merge(local.common_tags, {
+    name = "quality-site-runner-igw"
+  })
+}
+
+resource "aws_subnet" "runner" {
+  vpc_id                  = aws_vpc.runner.id
+  cidr_block              = "10.100.1.0/24"
+  availability_zone       = "${var.aws_region}a"
+  map_public_ip_on_launch = true
+
+  tags = merge(local.common_tags, {
+    name = "quality-site-runner-subnet"
+  })
+}
+ 
+resource "aws_route_table" "runner" {
+  vpc_id = aws_vpc.runner.id
+
+  route {
+    cidr_block = "0.0.0.0/0"
+    gateway_id = aws_internet_gateway.runner.id
+  }
+
+  tags = merge(local.common_tags, {
+    name = "quality-site-runner-rt"
+  })
+}
+
+resource "aws_route_table_association" "runner" {
+  subnet_id      = aws_subnet.runner.id
+  route_table_id = aws_route_table.runner.id
+}
+
+resource "aws_security_group" "runner" {
+  name        = "quality-site-runner-sg"
+  description = "Security group for GitHub Actions runner"
+  vpc_id      = aws_vpc.runner.id
+
+  # Note: No inbound rule for GitHub. Runners make outbound connections to GitHub
+  # and poll for jobs. GitHub never connects inbound to your runner.
+  ingress {
+    description = "SSH from allowed IP"
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = [var.allowed_ssh_cidr]
+  }
+
+  egress {
+    description = "Allow all outbound (required for runner to connect to GitHub)"
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = merge(local.common_tags, {
+    name = "quality-site-runner-sg"
+  })
+}
+
+resource "aws_secretsmanager_secret" "runner_token" {
+  name        = "quality-site/github-runner-token"
+  description = "GitHub Actions runner registration token for missing-table repo"
+
+  tags = merge(local.common_tags, {
+    name = "quality-site-runner-token"
+  })
+}
+
+resource "aws_iam_role" "runner" {
+  name = "quality-site-runner-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = "sts:AssumeRole"
+        Effect = "Allow"
+        Principal = {
+          Service = "ec2.amazonaws.com"
+        }
+      }
+    ]
+  })
+
+  tags = merge(local.common_tags, {
+    name = "quality-site-runner-role"
+  })
+}
+
+
+resource "aws_iam_role_policy" "runner" {
+  name = "quality-site-runner-policy"
+  role = aws_iam_role.runner.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "S3WriteAccess"
+        Effect = "Allow"
+        Action = [
+          "s3:PutObject",
+          "s3:DeleteObject",
+          "s3:ListBucket"
+        ]
+        Resource = [
+          aws_s3_bucket.quality_site.arn,
+          "${aws_s3_bucket.quality_site.arn}/*"
+        ]
+      },
+      {
+        Sid    = "CloudFrontInvalidation"
+        Effect = "Allow"
+        Action = [
+          "cloudfront:CreateInvalidation"
+        ]
+        Resource = aws_cloudfront_distribution.quality_site_cdn.arn
+      },
+      {
+        Sid    = "SecretsManagerReadToken"
+        Effect = "Allow"
+        Action = [
+          "secretsmanager:GetSecretValue"
+        ]
+        Resource = aws_secretsmanager_secret.runner_token.arn
+      }
+    ]
+  })
+}
+
+resource "aws_iam_instance_profile" "runner" {
+  name = "quality-site-runner-profile"
+  role = aws_iam_role.runner.name
+
+  tags = merge(local.common_tags, {
+    name = "quality-site-runner-profile"
+  })
+}
+
+
+resource "aws_key_pair" "runner" {
+  key_name   = "quality-site-runner-key"
+  public_key = var.runner_ssh_public_key
+
+  tags = merge(local.common_tags, {
+    name = "quality-site-runner-key"
+  })
+}
+
+data "aws_ami" "ubuntu" {
+  most_recent = true
+  owners      = ["099720109477"] # Canonical
+
+  filter {
+    name   = "name"
+    values = ["ubuntu/images/hvm-ssd-gp3/ubuntu-noble-24.04-amd64-server-*"]
+  }
+
+  filter {
+    name   = "virtualization-type"
+    values = ["hvm"]
+  }
+}
+
+resource "aws_instance" "runner" {
+  count = var.runner_enabled ? 1 : 0
+
+  ami                         = data.aws_ami.ubuntu.id
+  instance_type               = "t3.small"
+  key_name                    = aws_key_pair.runner.key_name
+  vpc_security_group_ids      = [aws_security_group.runner.id]
+  subnet_id                   = aws_subnet.runner.id
+  iam_instance_profile        = aws_iam_instance_profile.runner.name
+  associate_public_ip_address = true
+
+  root_block_device {
+    volume_size = 30
+    volume_type = "gp3"
+    encrypted   = true
+  }
+
+  tags = merge(local.common_tags, {
+    name = "quality-site-runner"
+    role = "github-runner"
+  })
+}

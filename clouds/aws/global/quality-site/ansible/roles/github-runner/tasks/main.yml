@@ -1,0 +1,187 @@
+---
+# Base GitHub Runner setup
+
+- name: Update apt cache
+  apt:
+    update_cache: yes
+    cache_valid_time: 3600
+
+- name: Install base packages
+  apt:
+    name:
+      - curl
+      - git
+      - jq
+      - unzip
+      - build-essential
+    state: present
+
+- name: Install Docker prerequisites
+  apt:
+    name:
+      - ca-certificates
+      - gnupg
+      - lsb-release
+    state: present
+
+- name: Add Docker GPG key
+  apt_key:
+    url: https://download.docker.com/linux/ubuntu/gpg
+    state: present
+
+- name: Add Docker repository
+  apt_repository:
+    repo: "deb [arch=amd64] https://download.docker.com/linux/ubuntu {{ ansible_facts['distribution_release'] }} stable"
+    state: present
+
+- name: Install Docker
+  apt:
+    name:
+      - docker-ce
+      - docker-ce-cli
+      - containerd.io
+    state: present
+    update_cache: yes
+
+- name: Add ubuntu user to docker group
+  user: 
+    name: ubuntu
+    groups: docker
+    append: yes
+
+- name: Install uv
+  shell: curl -LsSf https://astral.sh/uv/install.sh | sh
+  args:
+    creates: /home/ubuntu/.local/bin/uv
+  become: yes
+  become_user: ubuntu
+
+- name: Add NodeSource GPG key
+  apt_key:
+    url: https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key
+    state: present
+
+- name: Add NodeSource repository
+  apt_repository:
+    repo: "deb https://deb.nodesource.com/node_20.x nodistro main"
+    state: present
+
+- name: Install Node.js
+  apt:
+    name: nodejs
+    state: present
+    update_cache: yes
+
+- name: Install Playwright dependencies
+  shell: npx --yes playwright install-deps
+  args:
+    creates: /usr/lib/x86_64-linux-gnu/libatk-1.0.so.0
+
+# ====================================
+# GitHub Actions Runner Installation
+# ====================================
+- name: Create runner group
+  group:
+    name: "{{ runner_group }}"
+    state: present
+
+- name: Create runner user
+  user:
+    name: "{{ runner_user }}"
+    group: "{{ runner_group }}"
+    groups: docker
+    shell: /bin/bash
+    home: "{{ runner_home }}"
+    create_home: no
+
+- name: Create runner home directory
+  file:
+    path: "{{ runner_home }}"
+    state: directory
+    owner: "{{ runner_user }}"
+    group: "{{ runner_group }}"
+    mode: '0755'
+
+- name: Download GitHub Actions runner
+  get_url:
+    url: "https://github.com/actions/runner/releases/download/v{{ runner_version }}/actions-runner-linux-x64-{{ runner_version }}.tar.gz"
+    dest: "{{ runner_home }}/actions-runner.tar.gz"
+    owner: "{{ runner_user }}"
+    group: "{{ runner_group }}"
+    mode: '0644'
+  register: runner_download
+
+- name: Extract runner
+  unarchive:
+    src: "{{ runner_home }}/actions-runner.tar.gz"
+    dest: "{{ runner_home }}"
+    remote_src: yes
+    owner: "{{ runner_user }}"
+    group: "{{ runner_group }}"
+  when: runner_download.changed
+
+- name: Check if runner is already configured
+  stat:
+    path: "{{ runner_home }}/.runner"
+  register: runner_configured
+
+- name: Check if AWS CLI is installed
+  command: aws --version
+  register: aws_cli_check
+  ignore_errors: yes
+  changed_when: false
+
+- name: Download AWS CLI v2
+  get_url:
+    url: https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip
+    dest: /tmp/awscliv2.zip
+    mode: '0644'
+  when: aws_cli_check.rc != 0
+
+- name: Unzip AWS CLI v2
+  unarchive:
+    src: /tmp/awscliv2.zip
+    dest: /tmp
+    remote_src: yes
+  when: aws_cli_check.rc != 0
+
+- name: Install AWS CLI v2
+  command: /tmp/aws/install
+  when: aws_cli_check.rc != 0
+ 
+- name: Get runner token from Secrets Manager
+  command: >
+    aws secretsmanager get-secret-value
+    --secret-id {{ runner_token_secret_id }}
+    --region {{ aws_region }}
+    --query SecretString
+    --output text
+  register: runner_token
+  when: not runner_configured.stat.exists
+  no_log: true
+
+- name: Configure runner
+  shell: |
+    su - {{ runner_user }} -c "cd {{ runner_home }} && ./config.sh --url https://github.com/{{ github_repo }} --token {{ runner_token.stdout }} --name {{ runner_name }} --labels {{ runner_labels }} --unattended --replace"
+  when: not runner_configured.stat.exists
+  no_log: true
+
+# ==============================
+# Systemd Service Configuration 
+# ==============================
+
+- name: Install systemd service
+  template:
+    src: "{{ playbook_dir }}/../roles/github-runner/templates/github-runner.service.j2"
+    dest: /etc/systemd/system/github-runner.service
+    owner: root
+    group: root
+    mode: '0644'
+  notify: Restart github-runner
+
+- name: Enable and start github-runner service
+  systemd:
+    name: github-runner
+    enabled: yes
+    state: started
+    daemon_reload: yes

@@ -1,0 +1,16 @@
+---
+- name: Configure GitHub Runner
+  hosts: quality-runner
+  vars_files:
+    - ../roles/github-runner/vars/main.yml
+  tasks:
+    - name: Apply github-runner role
+      include_tasks: ../roles/github-runner/tasks/main.yml
+  handlers:
+    - name: Restart github-runner
+      systemd:
+        name: github-runner
+        state: restarted
+        daemon_reload: yes
+
+      

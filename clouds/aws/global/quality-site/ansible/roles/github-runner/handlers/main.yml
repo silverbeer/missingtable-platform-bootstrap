@@ -1,0 +1,6 @@
+---
+- name: Restart github-runner
+  systemd:
+    name: github-runner
+    state: restarted
+    daemon_reload: yes

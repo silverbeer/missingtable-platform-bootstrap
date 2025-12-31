@@ -1,0 +1,22 @@
+---
+# GitHub Actions Runner version
+# Check latest at: https://github.com/actions/runner/releases
+runner_version: "2.321.0"      # Latest stable
+
+# Runner installation location
+runner_user: "runner"
+runner_group: "runner"
+runner_home: "/opt/actions-runner"
+
+# GitHub repository to register runner for
+github_repo: "silverbeer/missing-table"
+
+# Runner identification
+runner_name: "quality-runner"
+runner_labels: "self-hosted,linux,x64,quality-runner"
+
+# AWS region for runner
+aws_region: "us-east-2"
+
+# AWS Secrets Manager secret ID for runner token
+runner_token_secret_id: "quality-site/github-runner-token"

@@ -1,0 +1,80 @@
+---
+# Base GitHub Runner setup
+
+- name: Update apt cache
+  apt:
+    update_cache: yes
+    cache_valid_time: 3600
+
+- name: Install base packages
+  apt:
+    name:
+      - curl
+      - git
+      - jq
+      - unzip
+      - build-essential
+    state: present
+
+- name: Install Docker prerequisites
+  apt:
+    name:
+      - ca-certificates
+      - gnupg
+      - lsb-release
+    state: present
+
+- name: Add Docker GPG key
+  apt_key:
+    url: https://download.docker.com/linux/ubuntu/gpg
+    state: present
+
+- name: Add Docker repository
+  apt_repository:
+    repo: "deb [arch=amd64] https://download.docker.com/linux/ubuntu {{ ansible_facts['distribution_release'] }} stable"
+    state: present
+
+- name: Install Docker
+  apt:
+    name:
+      - docker-ce
+      - docker-ce-cli
+      - containerd.io
+    state: present
+    update_cache: yes
+
+- name: Add ubuntu user to docker group
+  user: 
+    name: ubuntu
+    groups: docker
+    append: yes
+
+- name: Install uv
+  shell: curl -LsSf https://astral.sh/uv/install.sh | sh
+  args:
+    creates: /home/ubuntu/.local/bin/uv
+  become: yes
+  become_user: ubuntu
+
+- name: Add NodeSource GPG key
+  apt_key:
+    url: https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key
+    state: present
+
+- name: Add NodeSource repository
+  apt_repository:
+    repo: "deb https://deb.nodesource.com/node_20.x nodistro main"
+    state: present
+
+- name: Install Node.js
+  apt:
+    name: nodejs
+    state: present
+    update_cache: yes
+
+- name: Install Playwright dependencies
+  shell: npx --yes playwright install-deps
+  args:
+    creates: /usr/lib/x86_64-linux-gnu/libatk-1.0.so.0
+
+

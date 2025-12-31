@@ -1,0 +1,6 @@
+---
+- name: Configure GitHub Runner
+  hosts: quality-runner
+
+  roles:
+    - github-runner

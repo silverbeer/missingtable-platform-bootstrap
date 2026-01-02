@@ -44,7 +44,7 @@
     update_cache: yes
 
 - name: Add ubuntu user to docker group
-  user: 
+  user:
     name: ubuntu
     groups: docker
     append: yes
@@ -76,6 +76,46 @@
   shell: npx --yes playwright install-deps
   args:
     creates: /usr/lib/x86_64-linux-gnu/libatk-1.0.so.0
+
+- name: Copy uv to system-wide location
+  copy:
+    src: /home/ubuntu/.local/bin/uv
+    dest: /usr/local/bin/uv
+    remote_src: yes
+    mode: '0755'
+
+# ====================================
+# Java and Allure CLI Installation
+# ====================================
+- name: Install Java (required for Allure)
+  apt:
+    name: default-jre
+    state: present
+
+- name: Check if Allure is installed
+  stat:
+    path: /opt/allure-2.27.0/bin/allure
+  register: allure_installed
+
+- name: Download Allure CLI
+  get_url:
+    url: https://github.com/allure-framework/allure2/releases/download/2.27.0/allure-2.27.0.tgz
+    dest: /tmp/allure-2.27.0.tgz
+    mode: '0644'
+  when: not allure_installed.stat.exists
+
+- name: Extract Allure CLI
+  unarchive:
+    src: /tmp/allure-2.27.0.tgz
+    dest: /opt/
+    remote_src: yes
+  when: not allure_installed.stat.exists
+
+- name: Create Allure symlink
+  file:
+    src: /opt/allure-2.27.0/bin/allure
+    dest: /usr/local/bin/allure
+    state: link
 
 # ====================================
 # GitHub Actions Runner Installation
@@ -148,7 +188,7 @@
 - name: Install AWS CLI v2
   command: /tmp/aws/install
   when: aws_cli_check.rc != 0
- 
+
 - name: Get runner token from Secrets Manager
   command: >
     aws secretsmanager get-secret-value
@@ -167,7 +207,7 @@
   no_log: true
 
 # ==============================
-# Systemd Service Configuration 
+# Systemd Service Configuration
 # ==============================
 
 - name: Install systemd service

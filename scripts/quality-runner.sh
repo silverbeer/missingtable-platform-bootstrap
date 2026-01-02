@@ -12,8 +12,32 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 QUALITY_SITE_DIR="$SCRIPT_DIR/../clouds/aws/global/quality-site"
+ANSIBLE_INVENTORY="$QUALITY_SITE_DIR/ansible/inventory/quality-runner.yml"
 
 cd "$QUALITY_SITE_DIR"
+
+update_ansible_inventory() {
+  local public_ip="$1"
+  echo "Updating Ansible inventory with IP: $public_ip"
+  cat > "$ANSIBLE_INVENTORY" << EOF
+all:
+  hosts:
+    quality-runner:
+      ansible_host: $public_ip
+      ansible_python_interpreter: /usr/bin/python3
+EOF
+}
+
+refresh_runner_token() {
+  echo "Generating new GitHub runner registration token..."
+  local token
+  token=$(gh api repos/silverbeer/missing-table/actions/runners/registration-token --method POST --jq '.token')
+  aws secretsmanager put-secret-value \
+    --secret-id quality-site/github-runner-token \
+    --secret-string "$token" \
+    --region us-east-2 > /dev/null
+  echo "Token updated in Secrets Manager"
+}
 
 case "${1:-status}" in
   up|start|on)
@@ -21,6 +45,18 @@ case "${1:-status}" in
     echo "WARNING: This will cost ~\$15/month while running."
     echo ""
     tofu apply -var="runner_enabled=true"
+
+    # Get the public IP and update Ansible inventory
+    PUBLIC_IP=$(tofu output -raw runner_public_ip 2>/dev/null || echo "")
+    if [ -n "$PUBLIC_IP" ]; then
+      update_ansible_inventory "$PUBLIC_IP"
+      refresh_runner_token
+
+      echo ""
+      echo "To configure the runner, run:"
+      echo "  cd $QUALITY_SITE_DIR/ansible && ansible-playbook playbooks/configure-runner.yml"
+    fi
+
     echo ""
     echo "Runner is UP. Don't forget to run './scripts/quality-runner.sh down' when done!"
     ;;

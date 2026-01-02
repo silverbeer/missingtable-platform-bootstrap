@@ -80,34 +80,9 @@ resource "aws_s3_bucket_lifecycle_configuration" "quality_site_lifecycle" {
     }
 }
 
-resource "aws_s3_object" "index_html" {
-    bucket       = aws_s3_bucket.quality_site.id
-    key          = "index.html"
-    content_type = "text/html"
-
-    content = <<-EOF
-        <!DOCTYPE html>
-        <html lang="en">
-        <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Quality Site - MissingTable</title>
-        <style>
-            body { font-family: system-ui, sans-serif; max-width: 600px; margin: 100px auto; padding: 20px; text-align: center; }
-            h1 { color: #333; }
-            p { color: #666; }
-            .status { background: #e8f5e9; padding: 10px; border-radius: 4px; margin: 20px 0; }
-        </style>
-        </head>
-        <body>
-        <h1>Quality Site for MissingTable</h1>
-        <p>Test results and coverage reports for MissingTable</p>
-        <div class="status">Coming Soon</div>
-        <p><small>Infrastructure deployed via OpenTofu</small></p>
-        </body>
-        </html>
-    EOF
-}
+# NOTE: index.html is managed by the quality.yml workflow, not Terraform.
+# The workflow generates the dashboard and uploads it to S3.
+# Do NOT add an aws_s3_object for index.html here.
 
 
 # =============================================================================

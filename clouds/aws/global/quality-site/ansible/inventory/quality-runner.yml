@@ -1,5 +1,5 @@
 all:
   hosts:
     quality-runner:
-      ansible_host: 18.224.63.169
+      ansible_host: 18.119.128.31
       ansible_python_interpreter: /usr/bin/python3

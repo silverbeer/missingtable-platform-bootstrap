@@ -155,6 +155,33 @@ resource "aws_acm_certificate_validation" "quality_site_cert_validation" {
 # CLOUDFRONT - CDN and HTTPS termination
 # =============================================================================
 
+# CloudFront Function to handle subdirectory index.html requests
+# Without this, paths like /foo/bar/ return 403 instead of /foo/bar/index.html
+resource "aws_cloudfront_function" "index_rewrite" {
+  name    = "quality-site-index-rewrite"
+  runtime = "cloudfront-js-2.0"
+  publish = true
+  comment = "Rewrite directory paths to index.html"
+
+  code = <<-EOF
+    function handler(event) {
+      var request = event.request;
+      var uri = request.uri;
+
+      // If URI ends with '/', append index.html
+      if (uri.endsWith('/')) {
+        request.uri += 'index.html';
+      }
+      // If URI doesn't have an extension, assume it's a directory and add /index.html
+      else if (!uri.includes('.')) {
+        request.uri += '/index.html';
+      }
+
+      return request;
+    }
+  EOF
+}
+
 resource "aws_cloudfront_origin_access_control" "quality_site_cdn_oac" {
   name                              = "quality-site-oac"
   description                       = "OAC for quality.missingtable.com"
@@ -191,6 +218,11 @@ resource "aws_cloudfront_distribution" "quality_site_cdn" {
         min_ttl     = 0
         default_ttl = 3600
         max_ttl     = 86400
+
+        function_association {
+          event_type   = "viewer-request"
+          function_arn = aws_cloudfront_function.index_rewrite.arn
+        }
     }
 
     viewer_certificate {

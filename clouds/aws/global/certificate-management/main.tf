@@ -309,7 +309,7 @@ resource "aws_route53_record" "qualityplaybook_root" {
   name    = "qualityplaybook.dev"
   type    = "A"
   ttl     = 300
-  records = ["137.184.242.213"]
+  records = ["143.42.127.151"]
 }
 
 resource "aws_route53_record" "qualityplaybook_www" {
@@ -317,7 +317,7 @@ resource "aws_route53_record" "qualityplaybook_www" {
   name    = "www.qualityplaybook.dev"
   type    = "A"
   ttl     = 300
-  records = ["137.184.242.213"]
+  records = ["143.42.127.151"]
 }
 
 # =============================================================================
@@ -330,7 +330,7 @@ resource "aws_route53_record" "missingtable_root" {
   name    = var.domain_name
   type    = "A"
   ttl     = 300
-  records = ["137.184.242.213"]
+  records = ["143.42.127.151"]
 }
 
 resource "aws_route53_record" "missingtable_www" {
@@ -338,7 +338,7 @@ resource "aws_route53_record" "missingtable_www" {
   name    = "www.${var.domain_name}"
   type    = "A"
   ttl     = 300
-  records = ["137.184.242.213"]
+  records = ["143.42.127.151"]
 }
 
 resource "aws_route53_record" "argocd" {
@@ -346,5 +346,5 @@ resource "aws_route53_record" "argocd" {
   name    = "argocd.${var.domain_name}"
   type    = "A"
   ttl     = 300
-  records = ["137.184.242.213"]
+  records = ["143.42.127.151"]
 }

@@ -223,8 +223,90 @@ resource "aws_route53_record" "quality_site_dns" {
 }
 
 # =============================================================================
-# GITHUB RUNNER - EC2 instance for self-hosted Actions runner
+# GITHUB OIDC - Allows GitHub Actions to assume IAM role without secrets
+# =============================================================================
+
+resource "aws_iam_openid_connect_provider" "github" {
+  url = "https://token.actions.githubusercontent.com"
+
+  client_id_list = ["sts.amazonaws.com"]
+
+  # GitHub's OIDC thumbprint (rarely changes, but AWS validates it)
+  thumbprint_list = ["6938fd4d98bab03faadb97b34396831e3780aea1"]
+
+  tags = merge(local.common_tags, {
+    name = "github-actions-oidc"
+  })
+}
+
+resource "aws_iam_role" "github_actions_quality" {
+  name        = "github-actions-quality"
+  description = "Role assumed by GitHub Actions for quality workflow"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Principal = {
+          Federated = aws_iam_openid_connect_provider.github.arn
+        }
+        Action = "sts:AssumeRoleWithWebIdentity"
+        Condition = {
+          StringEquals = {
+            "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com"
+          }
+          StringLike = {
+            # Allow any branch/workflow in missing-table repo
+            "token.actions.githubusercontent.com:sub" = "repo:silverbeer/missing-table:*"
+          }
+        }
+      }
+    ]
+  })
+
+  tags = merge(local.common_tags, {
+    name = "github-actions-quality"
+  })
+}
+
+resource "aws_iam_role_policy" "github_actions_quality" {
+  name = "github-actions-quality-policy"
+  role = aws_iam_role.github_actions_quality.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "S3Access"
+        Effect = "Allow"
+        Action = [
+          "s3:PutObject",
+          "s3:GetObject",
+          "s3:DeleteObject",
+          "s3:ListBucket"
+        ]
+        Resource = [
+          aws_s3_bucket.quality_site.arn,
+          "${aws_s3_bucket.quality_site.arn}/*"
+        ]
+      },
+      {
+        Sid    = "CloudFrontInvalidation"
+        Effect = "Allow"
+        Action = [
+          "cloudfront:CreateInvalidation"
+        ]
+        Resource = aws_cloudfront_distribution.quality_site_cdn.arn
+      }
+    ]
+  })
+}
+
+# =============================================================================
+# GITHUB RUNNER - EC2 instance for self-hosted Actions runner (DEPRECATED)
 # Cost: ~$15/mo when running. Use runner_enabled=false to destroy.
+# NOTE: Replaced by GitHub OIDC above. Keep for reference or remove.
 # =============================================================================
 resource "aws_vpc" "runner" {
   cidr_block           = "10.100.0.0/16"

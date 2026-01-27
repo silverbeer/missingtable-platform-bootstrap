@@ -303,7 +303,7 @@ resource "aws_lambda_permission" "eventbridge_qualityplaybook" {
   source_arn    = aws_cloudwatch_event_rule.certbot_renewal_qualityplaybook.arn
 }
 
-# DNS A record for qualityplaybook.dev pointing to DOKS ingress
+# DNS A record for qualityplaybook.dev pointing to Kubernetes ingress
 resource "aws_route53_record" "qualityplaybook_root" {
   zone_id = aws_route53_zone.qualityplaybook.zone_id
   name    = "qualityplaybook.dev"
@@ -324,7 +324,7 @@ resource "aws_route53_record" "qualityplaybook_www" {
 # MISSINGTABLE.COM - DNS A Records
 # =============================================================================
 
-# DNS A record for missingtable.com pointing to DOKS ingress
+# DNS A record for missingtable.com pointing to Kubernetes ingress
 resource "aws_route53_record" "missingtable_root" {
   zone_id = aws_route53_zone.main.zone_id
   name    = var.domain_name
@@ -336,6 +336,14 @@ resource "aws_route53_record" "missingtable_root" {
 resource "aws_route53_record" "missingtable_www" {
   zone_id = aws_route53_zone.main.zone_id
   name    = "www.${var.domain_name}"
+  type    = "A"
+  ttl     = 300
+  records = ["143.42.127.151"]
+}
+
+resource "aws_route53_record" "missingtable_api" {
+  zone_id = aws_route53_zone.main.zone_id
+  name    = "api.${var.domain_name}"
   type    = "A"
   ttl     = 300
   records = ["143.42.127.151"]

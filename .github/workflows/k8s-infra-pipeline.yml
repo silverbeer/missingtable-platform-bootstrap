@@ -16,9 +16,10 @@ on:
       cloud:
         description: Cloud to deploy to
         required: true
-        default: digitalocean
+        default: linode
         type: choice
         options:
+          - linode
           - digitalocean
           - aws
       environment:
@@ -56,6 +57,7 @@ jobs:
 
       - name: Configure cloud credentials and Terraform variables
         run: |
+          echo "LINODE_TOKEN=${{ secrets.LINODE_TOKEN }}" >> $GITHUB_ENV
           echo "DIGITALOCEAN_TOKEN=${{ secrets.DIGITALOCEAN_TOKEN }}" >> $GITHUB_ENV
           echo "TF_VAR_digitalocean_token=${{ secrets.DIGITALOCEAN_TOKEN }}" >> $GITHUB_ENV
           echo "TF_VAR_database_url=${{ secrets.TF_VAR_DATABASE_URL }}" >> $GITHUB_ENV

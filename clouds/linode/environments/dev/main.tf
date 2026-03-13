@@ -128,39 +128,80 @@ resource "kubectl_manifest" "aws_secret_store" {
 }
 
 # =============================================================================
-# EXTERNAL SECRET - Sync TLS certificate from AWS to K8s
+# CERT-MANAGER - Automatic TLS certificate management via Let's Encrypt
+# Replaces the previous Lambda → AWS Secrets Manager → ExternalSecret pipeline
 # =============================================================================
-resource "kubectl_manifest" "tls_external_secret" {
-  yaml_body = <<YAML
-    apiVersion: external-secrets.io/v1beta1
-    kind: ExternalSecret
-    metadata:
-      name: missing-table-tls
-      namespace: missing-table
-    spec:
-      refreshInterval: 24h
-      secretStoreRef:
-        name: aws-secrets-manager
-        kind: ClusterSecretStore
-      target:
-        name: missing-table-tls
-        template:
-          type: kubernetes.io/tls
-          data:
-            tls.crt: "{{ .cert }}"
-            tls.key: "{{ .key }}"
-      data:
-        - secretKey: cert
-          remoteRef:
-            key: missingtable.com-tls
-            property: fullchain
-        - secretKey: key
-          remoteRef:
-            key: missingtable.com-tls
-            property: private_key
-  YAML
 
-  depends_on = [kubectl_manifest.aws_secret_store]
+resource "kubernetes_namespace_v1" "cert_manager" {
+  metadata {
+    name = "cert-manager"
+  }
+
+  depends_on = [linode_lke_cluster.main]
+}
+
+resource "helm_release" "cert_manager" {
+  name       = "cert-manager"
+  repository = "https://charts.jetstack.io"
+  chart      = "cert-manager"
+  namespace  = kubernetes_namespace_v1.cert_manager.metadata[0].name
+  version    = "1.17.1"
+
+  set {
+    name  = "installCRDs"
+    value = true
+  }
+
+  depends_on = [kubernetes_namespace_v1.cert_manager]
+}
+
+resource "time_sleep" "wait_for_cert_manager" {
+  depends_on      = [helm_release.cert_manager]
+  create_duration = "30s"
+}
+
+# ClusterIssuer - Let's Encrypt production with HTTP-01 via nginx ingress
+resource "kubectl_manifest" "letsencrypt_cluster_issuer" {
+  yaml_body = <<YAML
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-prod
+spec:
+  acme:
+    server: https://acme-v02.api.letsencrypt.org/directory
+    email: ${var.letsencrypt_email}
+    privateKeySecretRef:
+      name: letsencrypt-prod-key
+    solvers:
+      - http01:
+          ingress:
+            class: nginx
+YAML
+
+  depends_on = [time_sleep.wait_for_cert_manager]
+}
+
+# Certificate for missingtable.com (managed by cert-manager, auto-renews)
+resource "kubectl_manifest" "missing_table_certificate" {
+  yaml_body = <<YAML
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: missing-table-tls
+  namespace: missing-table
+spec:
+  secretName: missing-table-tls
+  issuerRef:
+    name: letsencrypt-prod
+    kind: ClusterIssuer
+  dnsNames:
+    - missingtable.com
+    - www.missingtable.com
+    - api.missingtable.com
+YAML
+
+  depends_on = [kubectl_manifest.letsencrypt_cluster_issuer]
 }
 
 # =============================================================================
@@ -241,40 +282,25 @@ YAML
   depends_on = [kubectl_manifest.aws_secret_store]
 }
 
-# =============================================================================
-# EXTERNAL SECRET - Sync qualityplaybook.dev TLS certificate
-# =============================================================================
-resource "kubectl_manifest" "qualityplaybook_tls_external_secret" {
+# Certificate for qualityplaybook.dev (managed by cert-manager, auto-renews)
+resource "kubectl_manifest" "qualityplaybook_certificate" {
   yaml_body = <<YAML
-    apiVersion: external-secrets.io/v1beta1
-    kind: ExternalSecret
-    metadata:
-      name: qualityplaybook-tls
-      namespace: qualityplaybook
-    spec:
-      refreshInterval: 24h
-      secretStoreRef:
-        name: aws-secrets-manager
-        kind: ClusterSecretStore
-      target:
-        name: qualityplaybook-tls
-        template:
-          type: kubernetes.io/tls
-          data:
-            tls.crt: "{{ .cert }}"
-            tls.key: "{{ .key }}"
-      data:
-        - secretKey: cert
-          remoteRef:
-            key: qualityplaybook.dev-tls
-            property: fullchain
-        - secretKey: key
-          remoteRef:
-            key: qualityplaybook.dev-tls
-            property: private_key
-  YAML
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: qualityplaybook-tls
+  namespace: qualityplaybook
+spec:
+  secretName: qualityplaybook-tls
+  issuerRef:
+    name: letsencrypt-prod
+    kind: ClusterIssuer
+  dnsNames:
+    - qualityplaybook.dev
+    - www.qualityplaybook.dev
+YAML
 
-  depends_on = [kubectl_manifest.aws_secret_store]
+  depends_on = [kubernetes_namespace_v1.qualityplaybook, kubectl_manifest.letsencrypt_cluster_issuer]
 }
 
 resource "kubernetes_namespace_v1" "qualityplaybook" {
@@ -564,38 +590,24 @@ YAML
   depends_on = [helm_release.argocd]
 }
 
-# ExternalSecret for ArgoCD TLS certificate
-resource "kubectl_manifest" "argocd_tls_external_secret" {
+# Certificate for ArgoCD (managed by cert-manager, auto-renews)
+resource "kubectl_manifest" "argocd_certificate" {
   yaml_body = <<YAML
-apiVersion: external-secrets.io/v1beta1
-kind: ExternalSecret
+apiVersion: cert-manager.io/v1
+kind: Certificate
 metadata:
   name: argocd-tls
   namespace: argocd
 spec:
-  refreshInterval: 24h
-  secretStoreRef:
-    name: aws-secrets-manager
-    kind: ClusterSecretStore
-  target:
-    name: argocd-tls
-    template:
-      type: kubernetes.io/tls
-      data:
-        tls.crt: "{{ .cert }}"
-        tls.key: "{{ .key }}"
-  data:
-    - secretKey: cert
-      remoteRef:
-        key: missingtable.com-tls
-        property: fullchain
-    - secretKey: key
-      remoteRef:
-        key: missingtable.com-tls
-        property: private_key
+  secretName: argocd-tls
+  issuerRef:
+    name: letsencrypt-prod
+    kind: ClusterIssuer
+  dnsNames:
+    - argocd.missingtable.com
 YAML
 
-  depends_on = [helm_release.argocd, kubectl_manifest.aws_secret_store]
+  depends_on = [helm_release.argocd, kubectl_manifest.letsencrypt_cluster_issuer]
 }
 
 # =============================================================================

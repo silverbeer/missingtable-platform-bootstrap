@@ -356,3 +356,40 @@ resource "aws_route53_record" "argocd" {
   ttl     = 300
   records = ["143.42.127.151"]
 }
+
+# =============================================================================
+# RESEND - Email sending (password reset)
+# Records provided by Resend after domain verification at resend.com/domains
+# =============================================================================
+
+resource "aws_route53_record" "resend_dkim" {
+  zone_id = aws_route53_zone.main.zone_id
+  name    = "resend._domainkey.contact.${var.domain_name}"
+  type    = "TXT"
+  ttl     = 300
+  records = [replace(var.resend_dkim_value, "/\\s+/", "")]
+}
+
+resource "aws_route53_record" "resend_spf" {
+  zone_id = aws_route53_zone.main.zone_id
+  name    = "send.contact.${var.domain_name}"
+  type    = "TXT"
+  ttl     = 300
+  records = ["v=spf1 include:amazonses.com ~all"]
+}
+
+resource "aws_route53_record" "resend_mx" {
+  zone_id = aws_route53_zone.main.zone_id
+  name    = "send.contact.${var.domain_name}"
+  type    = "MX"
+  ttl     = 300
+  records = ["10 feedback-smtp.us-east-1.amazonses.com"]
+}
+
+resource "aws_route53_record" "resend_dmarc" {
+  zone_id = aws_route53_zone.main.zone_id
+  name    = "_dmarc.contact.${var.domain_name}"
+  type    = "TXT"
+  ttl     = 300
+  records = ["v=DMARC1; p=none;"]
+}

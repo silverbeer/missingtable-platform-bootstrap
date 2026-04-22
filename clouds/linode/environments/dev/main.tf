@@ -246,6 +246,10 @@ spec:
       remoteRef:
         key: missing-table-app-secrets
         property: service_account_secret
+    - secretKey: telegram-bot-token
+      remoteRef:
+        key: missing-table-app-secrets
+        property: telegram_bot_token
 YAML
 
   depends_on = [kubectl_manifest.aws_secret_store]

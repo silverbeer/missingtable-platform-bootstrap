@@ -4,13 +4,13 @@
 
 resource "linode_lke_cluster" "main" {
   label       = "missingtable-dev"
-  k8s_version = "1.33"
+  k8s_version = "1.35"
   region      = "us-east" # Newark, close to AWS us-east-2
-  tags        = ["missing-table", "dev"]
+  tags        = ["missing-table", "dev", "prod"]
 
   pool {
     type  = "g6-standard-2" # 2 vCPU, 4GB (equiv to DO s-2vcpu-4gb)
-    count = 2
+    count = 1
   }
 }
 
@@ -312,6 +312,128 @@ resource "kubernetes_namespace_v1" "qualityplaybook" {
 }
 
 # =============================================================================
+# MYRUNSTREAK - Frontend on Kubernetes via ArgoCD
+# =============================================================================
+
+resource "kubernetes_namespace_v1" "myrunstreak" {
+  metadata {
+    name = "myrunstreak"
+  }
+
+  depends_on = [linode_lke_cluster.main]
+}
+
+resource "kubectl_manifest" "myrunstreak_certificate" {
+  yaml_body = <<YAML
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: myrunstreak-tls
+  namespace: myrunstreak
+spec:
+  secretName: myrunstreak-tls
+  issuerRef:
+    name: letsencrypt-prod
+    kind: ClusterIssuer
+  dnsNames:
+    - myrunstreak.run
+    - www.myrunstreak.run
+YAML
+
+  depends_on = [kubernetes_namespace_v1.myrunstreak, kubectl_manifest.letsencrypt_cluster_issuer]
+}
+
+resource "kubectl_manifest" "myrunstreak_app_external_secret" {
+  yaml_body = <<YAML
+apiVersion: external-secrets.io/v1beta1
+kind: ExternalSecret
+metadata:
+  name: myrunstreak-app-secrets
+  namespace: myrunstreak
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    name: aws-secrets-manager
+    kind: ClusterSecretStore
+  target:
+    name: myrunstreak-secrets
+  data:
+    - secretKey: supabase-url
+      remoteRef:
+        key: myrunstreak-app-secrets
+        property: supabase_url
+    - secretKey: supabase-anon-key
+      remoteRef:
+        key: myrunstreak-app-secrets
+        property: supabase_anon_key
+    - secretKey: supabase-service-key
+      remoteRef:
+        key: myrunstreak-app-secrets
+        property: supabase_service_key
+YAML
+
+  depends_on = [kubectl_manifest.aws_secret_store, kubernetes_namespace_v1.myrunstreak]
+}
+
+resource "kubectl_manifest" "myrunstreak_ghcr_external_secret" {
+  yaml_body = <<YAML
+apiVersion: external-secrets.io/v1beta1
+kind: ExternalSecret
+metadata:
+  name: myrunstreak-ghcr
+  namespace: myrunstreak
+spec:
+  refreshInterval: 24h
+  secretStoreRef:
+    name: aws-secrets-manager
+    kind: ClusterSecretStore
+  target:
+    name: myrunstreak-ghcr
+    template:
+      type: kubernetes.io/dockerconfigjson
+      data:
+        .dockerconfigjson: '{"auths":{"ghcr.io":{"username":"silverbeer","password":"{{ .ghcr_pat }}","auth":"{{ printf "silverbeer:%s" .ghcr_pat | b64enc }}"}}}'
+  data:
+    - secretKey: ghcr_pat
+      remoteRef:
+        key: missing-table-app-secrets
+        property: ghcr_pat
+YAML
+
+  depends_on = [kubectl_manifest.aws_secret_store, kubernetes_namespace_v1.myrunstreak]
+}
+
+resource "kubectl_manifest" "argocd_app_myrunstreak" {
+  yaml_body = <<YAML
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: myrunstreak
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/silverbeer/myrunstreak.run
+    targetRevision: main
+    path: helm/myrunstreak
+    helm:
+      valueFiles:
+        - values.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: myrunstreak
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+YAML
+
+  depends_on = [helm_release.argocd, kubernetes_namespace_v1.myrunstreak]
+}
+
+# =============================================================================
 # MONITORING - Grafana Cloud Observability
 # =============================================================================
 
@@ -421,13 +543,13 @@ resource "helm_release" "grafana_k8s_monitoring" {
     # Pods need: prometheus.io/scrape: "true", prometheus.io/port: "8000", prometheus.io/path: "/metrics"
     annotationAutodiscovery = {
       enabled    = true
-      namespaces = ["missing-table", "qualityplaybook"]
+      namespaces = ["missing-table", "qualityplaybook", "myrunstreak"]
     }
 
     # Log collection - only from our app namespaces
     podLogs = {
       enabled    = true
-      namespaces = ["missing-table", "qualityplaybook", "monitoring"]
+      namespaces = ["missing-table", "qualityplaybook", "myrunstreak", "monitoring"]
 
       # Drop noisy logs to save free tier quota
       extraLogProcessingStages = <<-EOT

@@ -250,6 +250,10 @@ spec:
       remoteRef:
         key: missing-table-app-secrets
         property: telegram_bot_token
+    - secretKey: email-inbound-webhook-secret
+      remoteRef:
+        key: missing-table-app-secrets
+        property: email_inbound_webhook_secret
 YAML
 
   depends_on = [kubectl_manifest.aws_secret_store]

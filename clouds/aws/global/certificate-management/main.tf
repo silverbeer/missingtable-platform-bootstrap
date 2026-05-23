@@ -393,3 +393,18 @@ resource "aws_route53_record" "resend_dmarc" {
   ttl     = 300
   records = ["v=DMARC1; p=none;"]
 }
+
+# =============================================================================
+# RESEND INBOUND - Support Inbox (SB-35)
+# MX on contact.missingtable.com so support@contact.missingtable.com lands in
+# Resend's inbound pipeline (which runs on Amazon SES under the hood). Do NOT
+# confuse this with the resend_mx resource above — that lives on
+# send.contact.missingtable.com and is the outbound bounce-return MX.
+# =============================================================================
+resource "aws_route53_record" "resend_inbound_mx" {
+  zone_id = aws_route53_zone.main.zone_id
+  name    = "contact.${var.domain_name}"
+  type    = "MX"
+  ttl     = 300
+  records = ["10 inbound-smtp.us-east-1.amazonaws.com"]
+}

@@ -254,6 +254,10 @@ spec:
       remoteRef:
         key: missing-table-app-secrets
         property: email_inbound_webhook_secret
+    - secretKey: resend-api-key
+      remoteRef:
+        key: missing-table-app-secrets
+        property: resend_api_key
 YAML
 
   depends_on = [kubectl_manifest.aws_secret_store]

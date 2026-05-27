@@ -258,6 +258,23 @@ spec:
       remoteRef:
         key: missing-table-app-secrets
         property: resend_api_key
+    # VAPID keypair + subject for Web Push notifications (SB-50, SB-51).
+    # vapid_public_key is non-secret but stored here for one-place lookup.
+    # Populate the three properties in the AWS Secrets Manager
+    # `missing-table-app-secrets` entry — see SB-50 ticket for the
+    # generation command.
+    - secretKey: vapid-public-key
+      remoteRef:
+        key: missing-table-app-secrets
+        property: vapid_public_key
+    - secretKey: vapid-private-key
+      remoteRef:
+        key: missing-table-app-secrets
+        property: vapid_private_key
+    - secretKey: vapid-subject
+      remoteRef:
+        key: missing-table-app-secrets
+        property: vapid_subject
 YAML
 
   depends_on = [kubectl_manifest.aws_secret_store]

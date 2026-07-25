@@ -33,11 +33,21 @@ resource "cloudflare_r2_bucket" "match_photos" {
   }
 }
 
-# ── Android APK distribution bucket — added under SB-313 on top of this stack ──
-# Public read (APK sideload) unlike the private, signed-URL photo bucket. Left
-# here as the next step, not created yet.
-#
-# resource "cloudflare_r2_bucket" "android_releases" {
-#   account_id = var.cloudflare_account_id
-#   name       = "mt-android-releases"
-# }
+# ── Android APK distribution bucket (SB-313) ─────────────────────────────────
+# Public read for anonymous APK sideload downloads, unlike the private,
+# signed-URL photo bucket. CI uploads the signed APK here; the MT web-UI
+# "Install Android app" button links to the public URL.
+resource "cloudflare_r2_bucket" "android_releases" {
+  account_id = var.cloudflare_account_id
+  name       = "mt-android-releases"
+}
+
+# Expose the bucket's public r2.dev development URL so the APK is downloadable
+# without auth. A branded downloads.missingtable.com custom domain
+# (cloudflare_r2_custom_domain) is deferred until the DNS zone is on Cloudflare
+# (Route53 -> CF cutover); until then this r2.dev URL backs the web-UI button.
+resource "cloudflare_r2_managed_domain" "android_releases" {
+  account_id  = var.cloudflare_account_id
+  bucket_name = cloudflare_r2_bucket.android_releases.name
+  enabled     = true
+}

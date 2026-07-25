@@ -8,8 +8,10 @@ hand-created R2 usage under Terraform) and the base the Android APK bucket
 
 - `mt-match-photos` — existing bucket for backend match-photo storage (SB-31).
   **Imported**, not created (see below).
-- `mt-android-releases` — public APK bucket, added later under SB-313 (commented
-  stub in `main.tf`).
+- `mt-android-releases` — public APK bucket (SB-313). Public read via the R2
+  managed `r2.dev` URL (see the `android_releases_public_url` output); CI uploads
+  the signed APK here. Branded `downloads.missingtable.com` custom domain is
+  deferred to the DNS cutover.
 
 ## Auth model (two different credentials)
 

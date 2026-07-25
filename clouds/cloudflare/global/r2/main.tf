@@ -1,0 +1,42 @@
+# Cloudflare R2 storage — foundation stack (Linear SB-314).
+#
+# This stack brings the existing, hand-created R2 usage under IaC and is the
+# shared foundation the Android APK bucket (SB-313) builds on.
+#
+# ── Bootstrapping (one-time, before `tofu apply`) ────────────────────────────
+#   1. In the Cloudflare dashboard, create an API token with
+#      "Workers R2 Storage: Edit" on the account.
+#   2. Copy clouds/cloudflare/global/r2/terraform.tfvars.example to
+#      terraform.tfvars (gitignored) and fill in account_id + api_token.
+#   3. `tofu init`
+#
+# ── Import the existing photo bucket (do NOT let plan try to recreate it) ─────
+#   The mt-match-photos bucket already exists (backend match-photo storage,
+#   SB-31). Import it, then run plan to reconcile:
+#     tofu import cloudflare_r2_bucket.match_photos "<account_id>/mt-match-photos"
+#     tofu plan   # add any attributes plan reports as drift (e.g. location)
+#   (Verify the exact import ID format against the provider v5 docs.)
+
+resource "cloudflare_r2_bucket" "match_photos" {
+  account_id = var.cloudflare_account_id
+  name       = "mt-match-photos"
+
+  # location / storage_class are set at creation and returned by the API. After
+  # the import, `tofu plan` will show whether they need to be pinned here to
+  # match the existing bucket — add them then rather than guessing now.
+
+  lifecycle {
+    # This bucket holds live production match photos — guard against an
+    # accidental destroy/recreate from a schema mismatch during import.
+    prevent_destroy = true
+  }
+}
+
+# ── Android APK distribution bucket — added under SB-313 on top of this stack ──
+# Public read (APK sideload) unlike the private, signed-URL photo bucket. Left
+# here as the next step, not created yet.
+#
+# resource "cloudflare_r2_bucket" "android_releases" {
+#   account_id = var.cloudflare_account_id
+#   name       = "mt-android-releases"
+# }

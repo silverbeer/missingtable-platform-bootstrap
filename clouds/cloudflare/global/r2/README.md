@@ -26,9 +26,11 @@ hand-created R2 usage under Terraform) and the base the Android APK bucket
 cp terraform.tfvars.example terraform.tfvars   # fill in account_id + api_token
 tofu init
 
-# Import the existing photo bucket so plan doesn't try to recreate it:
-tofu import cloudflare_r2_bucket.match_photos "<account_id>/mt-match-photos"
-tofu plan     # pin any attributes (e.g. location) plan reports as drift
+# Import the existing photo bucket so plan doesn't try to recreate it.
+# v5 import ID = "<account_id>/<bucket>/<jurisdiction>" (jurisdiction "default"
+# for a standard bucket; else "eu" / "fedramp"):
+tofu import cloudflare_r2_bucket.match_photos "<account_id>/mt-match-photos/default"
+tofu plan     # pin any attributes (e.g. jurisdiction, location) plan reports as drift
 ```
 
 ## State

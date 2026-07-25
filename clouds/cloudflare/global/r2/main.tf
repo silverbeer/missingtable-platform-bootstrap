@@ -12,10 +12,11 @@
 #
 # ── Import the existing photo bucket (do NOT let plan try to recreate it) ─────
 #   The mt-match-photos bucket already exists (backend match-photo storage,
-#   SB-31). Import it, then run plan to reconcile:
-#     tofu import cloudflare_r2_bucket.match_photos "<account_id>/mt-match-photos"
-#     tofu plan   # add any attributes plan reports as drift (e.g. location)
-#   (Verify the exact import ID format against the provider v5 docs.)
+#   SB-31). Import it, then run plan to reconcile. The v5 import ID is three
+#   urlencoded segments: "<account_id>/<bucket_name>/<jurisdiction>", where
+#   jurisdiction is "default" for a standard bucket (else "eu" / "fedramp"):
+#     tofu import cloudflare_r2_bucket.match_photos "<account_id>/mt-match-photos/default"
+#     tofu plan   # add any attributes plan reports as drift (e.g. jurisdiction, location)
 
 resource "cloudflare_r2_bucket" "match_photos" {
   account_id = var.cloudflare_account_id

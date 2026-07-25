@@ -527,4 +527,19 @@ aws eks describe-cluster --name CLUSTER_NAME
   - [ ] Manage GHCR package permissions as code
   - [ ] Goal: Zero clicks in GitHub UI for repo configuration
 
+## 2026-07-24 — Cloudflare R2 under Terraform (SB-314)
+
+First Cloudflare resources in IaC. New stack `clouds/cloudflare/global/r2/` (provider
+`cloudflare/cloudflare` v5, shared S3 state backend). Imports the existing hand-created
+`mt-match-photos` bucket (backend match-photo storage, SB-31) and is the foundation for
+the public `mt-android-releases` APK bucket (SB-313, Android app sideload distribution).
+
+- **Two credentials, kept distinct:** a Cloudflare API token for provider auth (gitignored
+  `terraform.tfvars`) vs the R2 S3 access keys the apps/CI use (AWS Secrets Manager
+  `missing-table/cloudflare/r2`).
+- **Coach mode retired** in CLAUDE.md the same day — Claude now authors the IaC directly.
+- A branded `downloads.missingtable.com` on R2 still needs the Route53→Cloudflare DNS
+  cutover (half-prepped).
+
+
 

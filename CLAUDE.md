@@ -4,56 +4,21 @@
 
 Multi-cloud Kubernetes infrastructure project deploying production applications across AWS, DigitalOcean, and potentially GCP/Azure.
 
-This is a learning-focused repository where code quality and understanding matter more than speed.
+This repository favors clear, reviewable infrastructure code. Claude writes the IaC directly; the owner reviews via PR and runs the plan/apply.
 
-## Coaching Philosophy
+## Working Style
 
-### The Golden Rule
-**ONE STEP AT A TIME.** Never write multiple modules at once. Never skip ahead.
+> Coach mode (explain-first / owner-writes-the-code, one step at a time) was retired 2026-07-24 — Claude now authors the Terraform/OpenTofu directly.
 
-### Recommended Workflow
+- **Claude writes the Terraform/OpenTofu**, and explains what each stack does + its cost implications in the PR description.
+- **Owner reviews and runs the plan/apply.** Never `tofu apply` without the owner reviewing the `tofu plan` first.
+- **Claude handles all git** — feature branches, descriptive commits, PRs. Never commit straight to `main` (protected).
+- **State management is not optional** — every stack uses the shared S3 backend (`missingtable-terraform-state`, `us-east-2`, lock table `terraform-state-lock`) with a unique `key`.
+- **Show cost implications** of infrastructure decisions.
+- Record notable decisions in `docs/decisions-log.md`.
 
-1. **Explain first** - Coach explains the concept and WHY before showing code
-2. **Student implementation** - Student writes the code (coach reviews, doesn't write directly)
-3. **Review together** - Run `tofu plan` and discuss output
-4. **Verify** - Run `tofu apply` and verify in cloud console
-5. **Git workflow** - Coach handles all git operations (branches, commits, PRs)
-6. **Documentation** - Document learnings in docs/decisions-log.md
-
-### What Makes Good Coaching
-
-**Do:**
-- Explain concepts before showing code
-- Ask "what do you think this does?" before explaining
-- Point out mistakes gently, let student fix them
-- Celebrate small wins
-- Handle git mechanics (branches, commits, PRs) so student focuses on IaC
-- Write clear, descriptive commit messages
-- Show cost implications of infrastructure decisions
-
-**Don't:**
-- Write boilerplate without explanation
-- Generate multiple files at once without discussion
-- Skip state management concepts
-- Auto-fix errors without teaching the underlying issue
-- Rush through important architectural decisions
-
-### Command Knowledge
-
-**OpenTofu/Terraform Commands:**
-- `tofu init` - Initialize, download providers
-- `tofu plan` - Preview changes (ALWAYS review before apply!)
-- `tofu apply` - Make changes (requires approval)
-- `tofu destroy` - Tear down resources (practice this for cost management!)
-- `tofu fmt` - Format code consistently
-- `tofu validate` - Check syntax errors
-
-**Git Workflow:**
-- Coach creates feature branches for organized development
-- Coach stages and commits changes with descriptive messages
-- Coach opens PRs with proper context and documentation
-- Student reviews and merges PRs
-- **Rationale**: Claude Code excels at git operations - this lets student focus on learning IaC
+### OpenTofu commands
+`tofu init` · `tofu plan` (ALWAYS review before apply) · `tofu apply` (owner approves) · `tofu fmt` · `tofu validate` · `tofu destroy` (mind costs).
 
 ---
 

@@ -259,7 +259,7 @@ resource "aws_route53_zone" "silverbeer_io" {
   tags = merge(local.common_tags, {
     project = "silverbeer"
     name    = "silverbeer.io-zone"
-    purpose = "DNS for silverbeer.io (org domain + Resend auth email)"
+    purpose = "DNS for silverbeer.io - org domain + Resend auth email"
   })
 }
 

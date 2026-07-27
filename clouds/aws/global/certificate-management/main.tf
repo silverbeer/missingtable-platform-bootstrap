@@ -263,6 +263,41 @@ resource "aws_route53_zone" "silverbeer_io" {
   })
 }
 
+# Resend domain verification for silverbeer.io (SB-365). Names/values exactly as
+# Resend's domain page provided — root domain (no `contact.` subdomain), so both
+# MT and STK send from @silverbeer.io. Apply, then verify in resend.com/domains.
+resource "aws_route53_record" "sb_resend_dkim" {
+  zone_id = aws_route53_zone.silverbeer_io.zone_id
+  name    = "resend._domainkey.silverbeer.io"
+  type    = "TXT"
+  ttl     = 300
+  records = ["p=MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQC9Cb8xXbTYLRQnVJhIGxRsqt70myxBnMjtO9HJkl5vGZuQ9h0tLWZ8SqzOnfiwjS2X5czpnbZIgiHFjKSe3yYFadlqL9vq+xgXURXhR1TaXurhPg5cQMvEbG+/Jy22IkhFFvpLoWFrWgvDDIPTosPxqbZSFLnMkHLTFhdMiKmElQIDAQAB"]
+}
+
+resource "aws_route53_record" "sb_resend_spf_mx" {
+  zone_id = aws_route53_zone.silverbeer_io.zone_id
+  name    = "send.silverbeer.io"
+  type    = "MX"
+  ttl     = 300
+  records = ["10 feedback-smtp.us-east-1.amazonses.com"]
+}
+
+resource "aws_route53_record" "sb_resend_spf_txt" {
+  zone_id = aws_route53_zone.silverbeer_io.zone_id
+  name    = "send.silverbeer.io"
+  type    = "TXT"
+  ttl     = 300
+  records = ["v=spf1 include:amazonses.com ~all"]
+}
+
+resource "aws_route53_record" "sb_resend_dmarc" {
+  zone_id = aws_route53_zone.silverbeer_io.zone_id
+  name    = "_dmarc.silverbeer.io"
+  type    = "TXT"
+  ttl     = 300
+  records = ["v=DMARC1; p=none;"]
+}
+
 resource "aws_secretsmanager_secret" "qualityplaybook_tls" {
   name        = "qualityplaybook.dev-tls"
   description = "TLS certificate for qualityplaybook.dev"

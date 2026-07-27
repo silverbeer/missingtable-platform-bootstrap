@@ -1,24 +1,29 @@
-# CLAUDE.md - AI Pair Programming Guide
+# CLAUDE.md - AI Agentic Development Guide
 
 ## Project Context
 
 Multi-cloud Kubernetes infrastructure project deploying production applications across AWS, DigitalOcean, and potentially GCP/Azure.
 
-This repository favors clear, reviewable infrastructure code. Claude writes the IaC directly; the owner reviews via PR and runs the plan/apply.
+Production-grade IaC, delivered agentically. This repo is part of the silverbeer agentic delivery system (Linear is the system of record). Quality and the guardrails below are non-negotiable; within them, move fast — no coaching, no step-gating.
 
-## Working Style
+## Agentic Development
 
-> Coach mode (explain-first / owner-writes-the-code, one step at a time) was retired 2026-07-24 — Claude now authors the Terraform/OpenTofu directly.
+> Coach mode (explain-first / owner-writes-the-code, one step at a time) was retired — Claude authors the Terraform/OpenTofu and drives the delivery loop directly.
 
-- **Claude writes the Terraform/OpenTofu**, and explains what each stack does + its cost implications in the PR description.
-- **Owner reviews and runs the plan/apply.** Never `tofu apply` without the owner reviewing the `tofu plan` first.
-- **Claude handles all git** — feature branches, descriptive commits, PRs. Never commit straight to `main` (protected).
+### The loop
+1. **Ticket** — every change starts from a Linear issue (`SB-N`) with a `BOOT` repo + type label and acceptance criteria.
+2. **Branch** — `linear.sh branch SB-N` → `silverbeer/sb-n-<slug>` (auto-moves the ticket to In Progress).
+3. **Implement** — Claude writes the tofu/Helm/config directly; small, reviewable diffs.
+4. **PR** — open with context + cost implications; the merge auto-transitions the ticket (In Review → Done). Claude merges its own green PRs; never commit straight to `main` (protected).
+
+### Guardrails (always)
+- **`tofu apply` is gated on a reviewed `tofu plan`.** This is a safety gate for real cloud changes (cost/blast-radius), NOT coaching — surface the plan + cost before applying; the owner approves the apply.
 - **State management is not optional** — every stack uses the shared S3 backend (`missingtable-terraform-state`, `us-east-2`, lock table `terraform-state-lock`) with a unique `key`.
-- **Show cost implications** of infrastructure decisions.
+- **100% IaC**, tagging, file structure, security/OIDC, cost awareness — per the standards below.
 - Record notable decisions in `docs/decisions-log.md`.
 
 ### OpenTofu commands
-`tofu init` · `tofu plan` (ALWAYS review before apply) · `tofu apply` (owner approves) · `tofu fmt` · `tofu validate` · `tofu destroy` (mind costs).
+`tofu init` · `tofu plan` (ALWAYS review before apply) · `tofu apply` (owner approves the plan) · `tofu fmt` · `tofu validate` · `tofu destroy` (mind costs).
 
 ---
 
@@ -156,7 +161,7 @@ This runner is for **learning purposes only** - not for running lots of tests.
 
 1. **100% Infrastructure as Code** - ALL infrastructure changes MUST be made via IaC (Terraform/OpenTofu, Helm). Never make manual changes via CLI (`aws`, `kubectl`, `gcloud`) without codifying them. If you fix something manually, immediately update the IaC to match.
 2. **Consistent Resource Tagging** - ALL AWS resources MUST have the required tags for cost tracking and organization.
-3. **Learn by doing** - Understanding > Speed
+3. **Agentic delivery** - Claude implements + drives the loop; guardrails over step-gating
 4. **Document decisions** - Future you will thank you
 5. **Cost awareness** - Always know what things cost
 6. **Security first** - No hardcoded secrets, use OIDC where possible

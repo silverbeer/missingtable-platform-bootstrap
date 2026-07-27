@@ -247,6 +247,22 @@ resource "aws_route53_zone" "qualityplaybook" {
   })
 }
 
+# =============================================================================
+# silverbeer.io — org domain for standardized auth email via Resend (SB-365).
+# Step 1: the hosted zone. Point Namecheap NS at this zone's name_servers
+# (see the silverbeer_io_nameservers output). The Resend DKIM/SPF/MX/DMARC
+# records get added once the domain is verified in Resend (needs its DKIM value).
+# =============================================================================
+resource "aws_route53_zone" "silverbeer_io" {
+  name = "silverbeer.io"
+
+  tags = merge(local.common_tags, {
+    project = "silverbeer"
+    name    = "silverbeer.io-zone"
+    purpose = "DNS for silverbeer.io (org domain + Resend auth email)"
+  })
+}
+
 resource "aws_secretsmanager_secret" "qualityplaybook_tls" {
   name        = "qualityplaybook.dev-tls"
   description = "TLS certificate for qualityplaybook.dev"

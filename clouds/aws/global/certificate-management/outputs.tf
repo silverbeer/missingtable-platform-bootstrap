@@ -28,3 +28,13 @@ output "qualityplaybook_zone_id" {
   description = "The zone ID for qualityplaybook.dev"
   value       = aws_route53_zone.qualityplaybook.zone_id
 }
+
+output "silverbeer_io_nameservers" {
+  description = "Nameservers for silverbeer.io — set these as Custom DNS on the domain in Namecheap (SB-365)"
+  value       = aws_route53_zone.silverbeer_io.name_servers
+}
+
+output "silverbeer_io_zone_id" {
+  description = "The zone ID for silverbeer.io"
+  value       = aws_route53_zone.silverbeer_io.zone_id
+}

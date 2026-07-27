@@ -247,6 +247,57 @@ resource "aws_route53_zone" "qualityplaybook" {
   })
 }
 
+# =============================================================================
+# silverbeer.io — org domain for standardized auth email via Resend (SB-365).
+# Step 1: the hosted zone. Point Namecheap NS at this zone's name_servers
+# (see the silverbeer_io_nameservers output). The Resend DKIM/SPF/MX/DMARC
+# records get added once the domain is verified in Resend (needs its DKIM value).
+# =============================================================================
+resource "aws_route53_zone" "silverbeer_io" {
+  name = "silverbeer.io"
+
+  tags = merge(local.common_tags, {
+    project = "silverbeer"
+    name    = "silverbeer.io-zone"
+    purpose = "DNS for silverbeer.io - org domain + Resend auth email"
+  })
+}
+
+# Resend domain verification for silverbeer.io (SB-365). Names/values exactly as
+# Resend's domain page provided — root domain (no `contact.` subdomain), so both
+# MT and STK send from @silverbeer.io. Apply, then verify in resend.com/domains.
+resource "aws_route53_record" "sb_resend_dkim" {
+  zone_id = aws_route53_zone.silverbeer_io.zone_id
+  name    = "resend._domainkey.silverbeer.io"
+  type    = "TXT"
+  ttl     = 300
+  records = ["p=MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQC9Cb8xXbTYLRQnVJhIGxRsqt70myxBnMjtO9HJkl5vGZuQ9h0tLWZ8SqzOnfiwjS2X5czpnbZIgiHFjKSe3yYFadlqL9vq+xgXURXhR1TaXurhPg5cQMvEbG+/Jy22IkhFFvpLoWFrWgvDDIPTosPxqbZSFLnMkHLTFhdMiKmElQIDAQAB"]
+}
+
+resource "aws_route53_record" "sb_resend_spf_mx" {
+  zone_id = aws_route53_zone.silverbeer_io.zone_id
+  name    = "send.silverbeer.io"
+  type    = "MX"
+  ttl     = 300
+  records = ["10 feedback-smtp.us-east-1.amazonses.com"]
+}
+
+resource "aws_route53_record" "sb_resend_spf_txt" {
+  zone_id = aws_route53_zone.silverbeer_io.zone_id
+  name    = "send.silverbeer.io"
+  type    = "TXT"
+  ttl     = 300
+  records = ["v=spf1 include:amazonses.com ~all"]
+}
+
+resource "aws_route53_record" "sb_resend_dmarc" {
+  zone_id = aws_route53_zone.silverbeer_io.zone_id
+  name    = "_dmarc.silverbeer.io"
+  type    = "TXT"
+  ttl     = 300
+  records = ["v=DMARC1; p=none;"]
+}
+
 resource "aws_secretsmanager_secret" "qualityplaybook_tls" {
   name        = "qualityplaybook.dev-tls"
   description = "TLS certificate for qualityplaybook.dev"
@@ -358,53 +409,10 @@ resource "aws_route53_record" "argocd" {
 }
 
 # =============================================================================
-# RESEND - Email sending (password reset)
-# Records provided by Resend after domain verification at resend.com/domains
+# RESEND — MT auth email moved to the shared silverbeer.io domain (SB-365).
+# The contact.missingtable.com Resend records (outbound DKIM/SPF/MX/DMARC + the
+# SB-35 inbound support MX) were removed: that Resend domain is being deleted and
+# both MT + STK now send from @silverbeer.io (see aws_route53_zone.silverbeer_io
+# and its sb_resend_* records above). Re-add a support inbox on silverbeer.io if
+# needed later.
 # =============================================================================
-
-resource "aws_route53_record" "resend_dkim" {
-  zone_id = aws_route53_zone.main.zone_id
-  name    = "resend._domainkey.contact.${var.domain_name}"
-  type    = "TXT"
-  ttl     = 300
-  records = [replace(var.resend_dkim_value, "/\\s+/", "")]
-}
-
-resource "aws_route53_record" "resend_spf" {
-  zone_id = aws_route53_zone.main.zone_id
-  name    = "send.contact.${var.domain_name}"
-  type    = "TXT"
-  ttl     = 300
-  records = ["v=spf1 include:amazonses.com ~all"]
-}
-
-resource "aws_route53_record" "resend_mx" {
-  zone_id = aws_route53_zone.main.zone_id
-  name    = "send.contact.${var.domain_name}"
-  type    = "MX"
-  ttl     = 300
-  records = ["10 feedback-smtp.us-east-1.amazonses.com"]
-}
-
-resource "aws_route53_record" "resend_dmarc" {
-  zone_id = aws_route53_zone.main.zone_id
-  name    = "_dmarc.contact.${var.domain_name}"
-  type    = "TXT"
-  ttl     = 300
-  records = ["v=DMARC1; p=none;"]
-}
-
-# =============================================================================
-# RESEND INBOUND - Support Inbox (SB-35)
-# MX on contact.missingtable.com so support@contact.missingtable.com lands in
-# Resend's inbound pipeline (which runs on Amazon SES under the hood). Do NOT
-# confuse this with the resend_mx resource above — that lives on
-# send.contact.missingtable.com and is the outbound bounce-return MX.
-# =============================================================================
-resource "aws_route53_record" "resend_inbound_mx" {
-  zone_id = aws_route53_zone.main.zone_id
-  name    = "contact.${var.domain_name}"
-  type    = "MX"
-  ttl     = 300
-  records = ["10 inbound-smtp.us-east-1.amazonaws.com"]
-}

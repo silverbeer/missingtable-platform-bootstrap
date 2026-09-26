@@ -412,7 +412,67 @@ resource "aws_route53_record" "argocd" {
 # RESEND — MT auth email moved to the shared silverbeer.io domain (SB-365).
 # The contact.missingtable.com Resend records (outbound DKIM/SPF/MX/DMARC + the
 # SB-35 inbound support MX) were removed: that Resend domain is being deleted and
-# both MT + STK now send from @silverbeer.io (see aws_route53_zone.silverbeer_io
-# and its sb_resend_* records above). Re-add a support inbox on silverbeer.io if
-# needed later.
+# MT sends from @contact.missingtable.com, verified in Resend on 2026-09-26.
+#
+# SB-365 moved sending to @silverbeer.io and deleted the records below. That
+# could not have worked: silverbeer.io is served by Namecheap, not Route53, so
+# aws_route53_zone.silverbeer_io is not authoritative for it and the
+# sb_resend_* records under it are never answered. Resend's free plan also
+# allows a single domain, and the slot now holds contact.missingtable.com.
+#
+# These records are what is live and delivering. Do not remove them without
+# first moving the domain in Resend.
 # =============================================================================
+
+resource "aws_route53_record" "resend_dkim" {
+  zone_id = aws_route53_zone.main.zone_id
+  name    = "resend._domainkey.contact.${var.domain_name}"
+  type    = "TXT"
+  ttl     = 300
+  records = [replace(var.resend_dkim_value, "/\\s+/", "")]
+}
+
+# Resend moved its sending infrastructure off Amazon SES to forge.rmta.net
+# and now verifies sending with two CNAMEs instead of an MX + SPF TXT pair.
+# The old records were an MX and a TXT at send.contact — a CNAME cannot share
+# a name with any other record type, so those had to go rather than sit
+# alongside these.
+resource "aws_route53_record" "resend_send_cname" {
+  zone_id = aws_route53_zone.main.zone_id
+  name    = "send.contact.${var.domain_name}"
+  type    = "CNAME"
+  ttl     = 300
+  records = ["send.forge.rmta.net"]
+}
+
+resource "aws_route53_record" "resend_rsend_cname" {
+  zone_id = aws_route53_zone.main.zone_id
+  name    = "rsend.contact.${var.domain_name}"
+  type    = "CNAME"
+  ttl     = 300
+  records = ["rsend.forge.rmta.net"]
+}
+
+
+resource "aws_route53_record" "resend_dmarc" {
+  zone_id = aws_route53_zone.main.zone_id
+  name    = "_dmarc.contact.${var.domain_name}"
+  type    = "TXT"
+  ttl     = 300
+  records = ["v=DMARC1; p=none;"]
+}
+
+# =============================================================================
+# RESEND INBOUND - Support Inbox (SB-35)
+# MX on contact.missingtable.com so support@contact.missingtable.com lands in
+# Resend's inbound pipeline (which runs on Amazon SES under the hood). Do NOT
+# confuse this with the resend_mx resource above — that lives on
+# send.contact.missingtable.com and is the outbound bounce-return MX.
+# =============================================================================
+resource "aws_route53_record" "resend_inbound_mx" {
+  zone_id = aws_route53_zone.main.zone_id
+  name    = "contact.${var.domain_name}"
+  type    = "MX"
+  ttl     = 300
+  records = ["10 inbound-smtp.us-east-1.amazonaws.com"]
+}

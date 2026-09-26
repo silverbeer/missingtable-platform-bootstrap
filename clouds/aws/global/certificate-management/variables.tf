@@ -9,3 +9,7 @@ variable "letsencrypt_email" {
   type        = string
 }
 
+variable "resend_dkim_value" {
+  description = "DKIM TXT record value provided by Resend after domain verification (resend.com/domains)"
+  type        = string
+}

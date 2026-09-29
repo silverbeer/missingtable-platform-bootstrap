@@ -275,6 +275,31 @@ spec:
       remoteRef:
         key: missing-table-app-secrets
         property: vapid_subject
+    # Cloudflare R2 — match photos (SB-31) and the Android APK (SB-313). These four
+    # were added to the live ExternalSecret with `kubectl patch` on 2026-07-25 and
+    # never reached this file, so an apply would have dropped them (codified in SB-1144).
+    - secretKey: r2-account-id
+      remoteRef:
+        key: missing-table-app-secrets
+        property: r2_account_id
+    - secretKey: r2-access-key-id
+      remoteRef:
+        key: missing-table-app-secrets
+        property: r2_access_key_id
+    - secretKey: r2-secret-access-key
+      remoteRef:
+        key: missing-table-app-secrets
+        property: r2_secret_access_key
+    - secretKey: r2-bucket
+      remoteRef:
+        key: missing-table-app-secrets
+        property: r2_bucket
+    # Gemini API key for MT AI (SB-1144). Set with missing-table's
+    # scripts/set-google-api-key-aws-secret.sh; the backend reads it as GOOGLE_API_KEY.
+    - secretKey: google-api-key
+      remoteRef:
+        key: missing-table-app-secrets
+        property: google_api_key
 YAML
 
   depends_on = [kubectl_manifest.aws_secret_store]

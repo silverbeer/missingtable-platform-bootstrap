@@ -1,0 +1,46 @@
+# mt-mcp Failures Alert
+# Fires when too many mt-mcp tool calls end failed (protocol error) or
+# unavailable (a dependency MT needs was down), as a share of all calls.
+# Dashboard: grafana/dashboards/mt-mcp.json
+
+name: mt-mcp Tool Call Failures
+description: More than 20% of mt-mcp tool calls failed or were unavailable over 15 minutes (minimum 20 calls)
+# Same routing as backend-500-errors: mt-mcp is served by the backend pod
+service: backend
+severity: warning
+
+# PromQL query to evaluate
+query:
+  # Ratio of failed + unavailable calls to all calls in the window.
+  # Volume guard: below 20 calls in the window the `and on()` drops the
+  # result and `or vector(0)` reports 0, so 1 failure in 2 calls at night
+  # does not page. Two uvicorn workers keep separate counters: always sum.
+  expr: >-
+    (
+      sum(increase(mt_mcp_tool_calls_total{namespace="missing-table", outcome=~"failed|unavailable"}[15m]))
+      /
+      sum(increase(mt_mcp_tool_calls_total{namespace="missing-table"}[15m]))
+    )
+    and on() (sum(increase(mt_mcp_tool_calls_total{namespace="missing-table"}[15m])) >= 20)
+    or vector(0)
+  # Time range to look back (seconds)
+  range_seconds: 900
+
+# Alert condition
+condition:
+  # Alert if failure ratio is greater than threshold (0.2 = 20%)
+  operator: gt
+  threshold: 0.2
+
+# How long condition must be true before firing
+pending_duration: 5m
+
+# Behavior when query returns no data or errors
+no_data_state: OK
+error_state: Alerting
+
+# Notification settings
+notifications:
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h

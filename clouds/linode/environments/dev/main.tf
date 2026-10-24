@@ -300,6 +300,25 @@ spec:
       remoteRef:
         key: missing-table-app-secrets
         property: google_api_key
+    # App Store Connect API key - TestFlight beta invites (SB-1314, SB-1414).
+    # Set with missing-table's scripts/set-asc-aws-secret.sh BEFORE applying:
+    # a mapped property missing from AWS fails the whole ExternalSecret sync.
+    - secretKey: asc-key-id
+      remoteRef:
+        key: missing-table-app-secrets
+        property: asc_key_id
+    - secretKey: asc-issuer-id
+      remoteRef:
+        key: missing-table-app-secrets
+        property: asc_issuer_id
+    - secretKey: asc-private-key
+      remoteRef:
+        key: missing-table-app-secrets
+        property: asc_private_key
+    - secretKey: asc-external-group-id
+      remoteRef:
+        key: missing-table-app-secrets
+        property: asc_external_group_id
 YAML
 
   depends_on = [kubectl_manifest.aws_secret_store]

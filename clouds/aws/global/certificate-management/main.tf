@@ -465,14 +465,19 @@ resource "aws_route53_record" "resend_dmarc" {
 # =============================================================================
 # RESEND INBOUND - Support Inbox (SB-35)
 # MX on contact.missingtable.com so support@contact.missingtable.com lands in
-# Resend's inbound pipeline (which runs on Amazon SES under the hood). Do NOT
-# confuse this with the resend_mx resource above — that lives on
-# send.contact.missingtable.com and is the outbound bounce-return MX.
+# Resend's inbound pipeline. Do NOT confuse this with the resend_mx resource
+# above — that lives on send.contact.missingtable.com and is the outbound
+# bounce-return MX.
+#
+# The value must match Resend dashboard → Domains → contact → Enable receiving.
+# As of 2026-10-30 the dashboard asks for receive.forge.rmta.net; while this
+# still pointed at inbound-smtp.us-east-1.amazonaws.com (receiving also off),
+# support mail was silently dropped — no bounce, nothing in Resend (SB-1462).
 # =============================================================================
 resource "aws_route53_record" "resend_inbound_mx" {
   zone_id = aws_route53_zone.main.zone_id
   name    = "contact.${var.domain_name}"
   type    = "MX"
   ttl     = 300
-  records = ["10 inbound-smtp.us-east-1.amazonaws.com"]
+  records = ["10 receive.forge.rmta.net"]
 }

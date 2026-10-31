@@ -543,3 +543,23 @@ the public `mt-android-releases` APK bucket (SB-313, Android app sideload distri
 
 
 
+
+## 2026-10-31 — Firebase Cloud Messaging under Terraform (SB-1465)
+
+First GCP stack: `clouds/gcp/global/firebase-messaging/` (google + google-beta v8,
+shared S3 state backend). Firebase lives in a dedicated, unbilled project
+`mta-firebase-45c8a` (Spark plan, so it can't be charged) and registers both Android
+applicationIds for FCM HTTP v1 push (backend side: SB-1463).
+
+- **Separate project, created in the console and imported.** `projects.addFirebase` on
+  `missing-table` returned a bare 403 for its owner, even after accepting the terms.
+  A new unbilled project also meets the "no added cost" condition by construction.
+
+- **No `google_service_account_key` in Terraform** — the private key would sit in
+  plaintext state. `scripts/set-fcm-aws-secret.sh` creates it and writes it straight
+  to AWS SM `missing-table-app-secrets`; ESO maps it as `fcm-service-account-json`.
+- **$1 billing budget** with default-IAM-recipient emails as a tripwire: FCM is free,
+  so any spend is a surprise. The v8 provider rejects an `all_updates_rule` without a
+  Pub/Sub topic or monitoring channel, so the block is omitted (API default = emails).
+- ADC needs `user_project_override` + `billing_project` for the Firebase and Budgets APIs.
+  The budget uses a `google.budget` provider alias billed to `missing-table`.

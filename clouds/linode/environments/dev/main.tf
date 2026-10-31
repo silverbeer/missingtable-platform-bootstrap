@@ -319,6 +319,13 @@ spec:
       remoteRef:
         key: missing-table-app-secrets
         property: asc_external_group_id
+    # FCM HTTP v1 service-account JSON - Android push (SB-1463, SB-1465).
+    # Set with this repo's scripts/set-fcm-aws-secret.sh BEFORE applying:
+    # a mapped property missing from AWS fails the whole ExternalSecret sync.
+    - secretKey: fcm-service-account-json
+      remoteRef:
+        key: missing-table-app-secrets
+        property: fcm_service_account_json
 YAML
 
   depends_on = [kubectl_manifest.aws_secret_store]

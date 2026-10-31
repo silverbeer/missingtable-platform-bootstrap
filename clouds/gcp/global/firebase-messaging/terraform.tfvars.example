@@ -1,0 +1,18 @@
+# Copy this to terraform.tfvars (gitignored). None of these values are secrets.
+#
+# project_id: the Firebase project (no billing, Spark plan).
+# Billing account: the one missing-table (budget_project_id) is linked to.
+
+project_id      = "mta-firebase-45c8a"
+billing_account = "01BAFD-AE0170-287DC6"
+
+android_apps = {
+  prod = {
+    package_name = "com.missingtable.scorer"
+    display_name = "Missing Table Android"
+  }
+  local = {
+    package_name = "com.missingtable.scorer.local"
+    display_name = "Missing Table Android (local)"
+  }
+}

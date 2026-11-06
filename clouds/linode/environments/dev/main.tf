@@ -326,6 +326,13 @@ spec:
       remoteRef:
         key: missing-table-app-secrets
         property: fcm_service_account_json
+    # Bearer for sb-support-api (sb-agents on this cluster, SB-1570); the backend
+    # reads it as MT_AI_SB_AGENTS_TOKEN. Set with sb-agents'
+    # helm/sb-agents/set-aws-secret.sh BEFORE applying (see FCM note above).
+    - secretKey: sb-agents-token
+      remoteRef:
+        key: missing-table-app-secrets
+        property: sb_agents_api_token
 YAML
 
   depends_on = [kubectl_manifest.aws_secret_store]
@@ -511,6 +518,38 @@ spec:
 YAML
 
   depends_on = [helm_release.argocd, kubernetes_namespace_v1.myrunstreak]
+}
+
+# sb-agents: MT app chat path (SB-1570). Chart, secrets (ESO) and pull secret
+# live in the sb-agents repo; runbook docs/notes/deploy-lke.md there.
+resource "kubectl_manifest" "argocd_app_sb_agents" {
+  yaml_body = <<YAML
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: sb-agents
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/silverbeer/sb-agents
+    targetRevision: main
+    path: helm/sb-agents
+    helm:
+      valueFiles:
+        - values.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: sb-agents
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+YAML
+
+  depends_on = [helm_release.argocd]
 }
 
 # =============================================================================

@@ -216,21 +216,10 @@ Both workflows use OIDC for secure, temporary AWS credentials.
 
 ## Grafana Dashboards and Alerts
 
-Defined as code and deployed to Grafana Cloud by the `grafana-dashboards` and
-`grafana-alerts` modules, instantiated by `clouds/linode/environments/dev/main.tf`. Each
-module picks up every file in its directory, so adding one needs no Terraform
-change: it ships on the next `tofu apply` (the Infrastructure Deployment workflow).
-
-| File | What it shows / when it fires |
-|------|-------------------------------|
-| `grafana/dashboards/api-metrics.json` | Backend HTTP request rate, latency and errors |
-| `grafana/dashboards/mt-mcp.json` | mt-mcp tool calls by tool and client, outcome mix, not_found/ambiguous, refused calls, p95 per tool, `mt_mcp.tool_call` logs |
-| `grafana/alerts/backend-500-errors.yaml` | Any backend 5xx in 5 minutes (critical) |
-| `grafana/alerts/mt-mcp-failures.yaml` | `failed` + `unavailable` above 20% of mt-mcp calls over 15 minutes, only once there are at least 20 calls (warning) |
-
-Alerts route by their `service` label; both use `backend`, so they share the
-Backend Alerts Email contact point. The mt-mcp metrics are per uvicorn worker,
-so every query sums across series.
+Moved to [silverbeer/sb-observability](https://github.com/silverbeer/sb-observability)
+(`stacks/grafana-cloud`) in SB-1693: dashboards, alert rules, contact points and
+the notification policy tree. This repo still deploys the Alloy collectors on LKE
+(`helm_release.grafana_k8s_monitoring` in `clouds/linode/environments/dev`).
 
 ## Contributing
 

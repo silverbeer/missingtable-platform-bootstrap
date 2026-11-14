@@ -726,55 +726,9 @@ resource "helm_release" "grafana_k8s_monitoring" {
   })]
 }
 
-# =============================================================================
-# GRAFANA DASHBOARDS - Modular Dashboard Definitions
-# =============================================================================
-# Dashboards are defined in JSON files at: grafana/dashboards/*.json
-# Add a new JSON file and run tofu apply to deploy new dashboards.
-# =============================================================================
-
-module "grafana_dashboards" {
-  source = "../../../../modules/grafana-dashboards"
-
-  providers = {
-    grafana = grafana
-  }
-
-  dashboards_path = "${path.module}/../../../../grafana/dashboards"
-  folder_title    = "Missing Table"
-}
-
-# =============================================================================
-# GRAFANA ALERTING - Modular Alert Definitions
-# =============================================================================
-# Alerts are defined in YAML files at: grafana/alerts/*.yaml
-# Add a new YAML file and run tofu apply to deploy new alerts.
-# =============================================================================
-
-# Email contact point for alerts
-resource "grafana_contact_point" "backend_email" {
-  name = "Backend Alerts Email"
-
-  email {
-    addresses               = [var.alert_email]
-    single_email            = true
-    message                 = "{{ len .Alerts.Firing }} alert(s) firing:\n\n{{ range .Alerts.Firing }}{{ .Annotations.summary }}\n{{ .Annotations.description }}\n\n{{ end }}"
-    disable_resolve_message = false
-  }
-}
-
-# Deploy all alerts from YAML definitions
-module "grafana_alerts" {
-  source = "../../../../modules/grafana-alerts"
-
-  providers = {
-    grafana = grafana
-  }
-
-  alerts_path   = "${path.module}/../../../../grafana/alerts"
-  folder_title  = "Missing Table Alerts"
-  contact_point = grafana_contact_point.backend_email.name
-}
+# Grafana dashboards, alert rules, contact points and the notification policy
+# live in silverbeer/sb-observability (stacks/grafana-cloud) since SB-1693.
+# This stack still ships the Alloy collectors above.
 
 # =============================================================================
 # ARGOCD - GitOps Continuous Delivery

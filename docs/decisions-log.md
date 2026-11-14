@@ -6,6 +6,8 @@ Quick notes captured during OpenTofu ninja training. Will be formalized later.
 
 ## DigitalOcean (Blue Belt → Brown Belt)
 
+> Historical: production later moved to Linode LKE (`clouds/linode/environments/dev`) and the DigitalOcean environment code was removed in SB-1689.
+
 ### 100% IaC Achieved
 
 **Definition**: `tofu destroy && tofu apply` recreates everything with zero manual steps.

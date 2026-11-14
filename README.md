@@ -9,7 +9,7 @@ Multi-cloud Kubernetes infrastructure as code (IaC) learning journey, deploying 
 ## What is this?
 
 A **production-grade learning project** that demonstrates:
-- Multi-cloud Kubernetes deployments (AWS, DigitalOcean, and more)
+- Multi-cloud Kubernetes deployments (Linode LKE in production, AWS for global services)
 - Infrastructure as Code with OpenTofu (open-source Terraform fork)
 - Automated certificate management with Let's Encrypt
 - CI/CD pipelines with GitHub Actions
@@ -22,12 +22,18 @@ This repository manages infrastructure for two production domains:
 
 ## What's Deployed
 
-**DigitalOcean DOKS (Production):**
-- ✅ Kubernetes cluster (2 nodes, $48/month)
-- ✅ Application deployments (frontend + backend)
-- ✅ Ingress with TLS certificates
-- ✅ External Secrets sync from AWS
+**Linode LKE (Production):** `clouds/linode/environments/dev`
+
+The environment directory is named `dev` for historical reasons; it is the
+production cluster for missingtable.com.
+
+- ✅ LKE Kubernetes cluster (`missingtable-dev`, 1x g6-standard-2 node)
+- ✅ Ingress-nginx with TLS certificates (cert-manager + Let's Encrypt)
+- ✅ External Secrets sync from AWS Secrets Manager
+- ✅ Grafana Cloud monitoring (k8s-monitoring / Alloy), dashboards and alerts
 - ✅ DNS managed via Route 53
+
+The earlier DigitalOcean DOKS environment was removed in SB-1689.
 
 **AWS (Global Services):**
 - ✅ Lambda-based certificate management (certbot + Route 53 DNS-01)
@@ -49,11 +55,14 @@ This repository manages infrastructure for two production domains:
 - [OpenTofu](https://opentofu.org/) >= 1.8.0
 - [kubectl](https://kubernetes.io/docs/tasks/tools/) >= 1.28
 - [AWS CLI](https://aws.amazon.com/cli/) configured
-- [doctl](https://docs.digitalocean.com/reference/doctl/) (for DigitalOcean)
 - AWS account with Route 53 hosted zone
-- DigitalOcean account
+- Linode (Akamai) account and API token
 
-### Deploy DOKS Environment
+### Deploy the LKE Environment
+
+Production changes go through the **K8s Infra Pipeline** workflow
+(`workflow_dispatch`, `cloud=linode`, `environment=dev`); a reviewed `tofu plan`
+gates every `apply`. Locally:
 
 ```bash
 # Clone the repository
@@ -61,14 +70,13 @@ git clone https://github.com/silverbeer/missingtable-platform-bootstrap.git
 cd missingtable-platform-bootstrap
 
 # Configure variables
-cd clouds/digitalocean/environments/dev
+cd clouds/linode/environments/dev
 cp terraform.tfvars.example terraform.tfvars
 # Edit terraform.tfvars with your values
 
 # Deploy
 tofu init
 tofu plan
-tofu apply
 ```
 
 See [Getting Started Guide](docs/guides/getting-started.md) for detailed instructions.
@@ -76,6 +84,10 @@ See [Getting Started Guide](docs/guides/getting-started.md) for detailed instruc
 ## Architecture
 
 ### Certificate Management Architecture
+
+> On the production LKE cluster, ingress TLS is issued in-cluster by
+> cert-manager (Let's Encrypt). The AWS Lambda pipeline below predates that and
+> still produces certificates in Secrets Manager / ACM.
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -104,7 +116,7 @@ See [Getting Started Guide](docs/guides/getting-started.md) for detailed instruc
                                                        │ Syncs to K8s
                                                        ▼
                                        ┌─────────────────────────┐
-                                       │  DOKS Cluster           │
+                                       │  Kubernetes cluster     │
                                        │  ┌─────────────────┐    │
                                        │  │ TLS Secrets     │    │
                                        │  │ (auto-renewed)  │    │
@@ -117,7 +129,7 @@ Certificates are automatically:
 - Validated using Route 53 DNS-01 challenge
 - Stored in AWS Secrets Manager
 - Imported to ACM for EKS Load Balancers
-- Synced to DOKS via External Secrets Operator
+- Synced to Kubernetes via External Secrets Operator (the DOKS-era path)
 - Renewed daily (90-day certs, checked daily)
 
 ## Repository Structure
@@ -132,8 +144,8 @@ Certificates are automatically:
 │   │   └── global/
 │   │       ├── terraform-state/        # S3 + DynamoDB backend
 │   │       └── certificate-management/ # Lambda + Route53 + Secrets
-│   └── digitalocean/
-│       └── environments/dev/           # DOKS cluster + apps + ingress
+│   └── linode/
+│       └── environments/dev/           # Production LKE cluster + ingress + monitoring
 ├── docs/
 │   ├── decisions-log.md                # Learning journal
 │   ├── guides/                         # How-to guides
@@ -147,11 +159,11 @@ Certificates are automatically:
 
 | Service | Monthly Cost | Notes |
 |---------|--------------|-------|
-| DOKS Cluster | $48 | 2x s-2vcpu-4gb nodes (control plane free!) |
+| LKE Cluster | see Linode pricing | 1x g6-standard-2 node (control plane free) |
 | Lambda (certbot) | ~$0 | Free tier sufficient |
 | S3 (state) | ~$0 | Minimal usage |
 | Route 53 | ~$1 | 2 hosted zones |
-| **Total** | **~$49/month** | 70% cheaper than EKS! |
+| **Total** | **cluster + ~$1/month** | |
 
 For comparison: AWS EKS would cost ~$165/month ($73 control plane + $60 nodes + $32 NAT Gateway).
 
@@ -170,7 +182,7 @@ For comparison: AWS EKS would cost ~$165/month ($73 control plane + $60 nodes + 
 
 See [decisions-log.md](docs/decisions-log.md) for detailed technical decisions and lessons learned, including:
 
-- Why DOKS is dramatically simpler than EKS (1 resource vs ~15)
+- Why a managed control plane (DOKS, now LKE) is dramatically simpler than EKS (1 resource vs ~15)
 - DNS-01 challenge vs HTTP-01 for certificate validation
 - Remote state management for CI/CD
 - OIDC authentication vs static credentials
@@ -205,7 +217,7 @@ Both workflows use OIDC for secure, temporary AWS credentials.
 ## Grafana Dashboards and Alerts
 
 Defined as code and deployed to Grafana Cloud by the `grafana-dashboards` and
-`grafana-alerts` modules, which every environment's `main.tf` instantiates. Each
+`grafana-alerts` modules, instantiated by `clouds/linode/environments/dev/main.tf`. Each
 module picks up every file in its directory, so adding one needs no Terraform
 change: it ships on the next `tofu apply` (the Infrastructure Deployment workflow).
 

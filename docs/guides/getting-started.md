@@ -1,5 +1,12 @@
 # Getting Started Guide
 
+> **Outdated (SB-1689):** Phase 2 below describes the DigitalOcean DOKS
+> environment, which has been removed from this repo. Production now runs on
+> Linode LKE from `clouds/linode/environments/dev` (named `dev`, but it is
+> production), applied through the K8s Infra Pipeline workflow with
+> `cloud=linode`. The AWS phases still apply. Treat the DOKS steps as history
+> until this guide is rewritten.
+
 Complete step-by-step guide to deploy the infrastructure from scratch.
 
 ## Overview

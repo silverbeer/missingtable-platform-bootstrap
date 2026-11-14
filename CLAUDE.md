@@ -2,7 +2,7 @@
 
 ## Project Context
 
-Multi-cloud Kubernetes infrastructure project deploying production applications across AWS, DigitalOcean, and potentially GCP/Azure.
+Multi-cloud Kubernetes infrastructure project deploying production applications on Linode LKE, with global services on AWS, and potentially GCP/Azure.
 
 Production-grade IaC, delivered agentically. This repo is part of the silverbeer agentic delivery system (Linear is the system of record). Quality and the guardrails below are non-negotiable; within them, move fast — no coaching, no step-gating.
 
@@ -31,13 +31,15 @@ Production-grade IaC, delivered agentically. This repo is part of the silverbeer
 
 ### Production Deployments
 
-**DigitalOcean DOKS:**
-- Kubernetes cluster (2 nodes)
-- Application deployments (frontend + backend)
+**Linode LKE (production)** — `clouds/linode/environments/dev` (named `dev`, but it is production), applied via `.github/workflows/k8s-infra-pipeline.yml`:
+- Kubernetes cluster (1x g6-standard-2 node)
 - Nginx ingress with path-based routing
 - TLS certificates via Let's Encrypt
 - External Secrets sync from AWS
+- Grafana Cloud monitoring (k8s-monitoring/Alloy), dashboards and alerts
 - DNS managed via Route 53
+
+The old DigitalOcean DOKS environment was removed in SB-1689.
 
 **AWS Global Services:**
 - Lambda-based certificate management (certbot + Route 53 DNS-01)
@@ -61,7 +63,7 @@ Production-grade IaC, delivered agentically. This repo is part of the silverbeer
 ### Key Technical Decisions
 
 See [docs/decisions-log.md](docs/decisions-log.md) for detailed rationale, including:
-- Why DOKS over EKS for this use case (simplicity + cost)
+- Why a managed control plane (DOKS, later LKE) over EKS (simplicity + cost)
 - DNS-01 challenge vs HTTP-01 for certificate validation
 - Remote state management with S3 + DynamoDB
 - OIDC authentication vs static AWS credentials
@@ -117,7 +119,7 @@ docs/
 ### Cost Management
 
 **Always consider cost:**
-- Destroy DOKS cluster when not actively using ($48/month savings)
+- The LKE cluster is production — never destroy it to save cost
 - Keep AWS infrastructure running (minimal cost: ~$1/month)
 - Lambda stays in free tier
 - Document monthly costs in architecture decisions

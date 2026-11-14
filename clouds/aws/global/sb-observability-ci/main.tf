@@ -16,9 +16,15 @@ locals {
     cost_center = "engineering"
   }
 
-  github_repo  = "silverbeer/sb-observability"
-  state_bucket = "missingtable-terraform-state"
-  state_prefix = "sb-observability/"
+  github_repo = "silverbeer/sb-observability"
+  # GitHub issues repos created since its immutable-subject change an OIDC
+  # `sub` that carries owner and repo IDs, not just names:
+  #   repo:silverbeer@96834016/sb-observability@1457964178:<ref>
+  # Read it with: gh api repos/silverbeer/sb-observability/actions/oidc/customization/sub
+  # The IDs also mean a rename or a recreated repo of the same name no longer matches.
+  github_sub_prefix = "repo:silverbeer@96834016/sb-observability@1457964178"
+  state_bucket      = "missingtable-terraform-state"
+  state_prefix      = "sb-observability/"
 }
 
 data "aws_iam_openid_connect_provider" "github" {
@@ -42,7 +48,7 @@ resource "aws_iam_role" "github_actions_sb_observability" {
           }
           StringLike = {
             # Any branch or PR: PRs plan, pushes to main apply.
-            "token.actions.githubusercontent.com:sub" = "repo:${local.github_repo}:*"
+            "token.actions.githubusercontent.com:sub" = "${local.github_sub_prefix}:*"
           }
         }
       }

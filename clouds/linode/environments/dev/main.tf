@@ -565,6 +565,14 @@ resource "kubernetes_namespace_v1" "monitoring" {
 }
 
 # Sync Grafana Cloud credentials from AWS Secrets Manager
+#
+# TODO(SB-1695): nothing reads the resulting `grafana-cloud-credentials`
+# Secret. The k8s-monitoring release below takes its Grafana Cloud URLs,
+# usernames and token straight from TF vars (var.grafana_cloud_*), and its only
+# link to this resource is the depends_on ordering. Decide whether to switch the
+# Alloy release to this Secret or drop it when the release moves to
+# sb-observability (SB-1695). Left in place deliberately: removing it here
+# would be a destroy in the Linode plan.
 resource "kubectl_manifest" "grafana_cloud_external_secret" {
   yaml_body = <<YAML
 apiVersion: external-secrets.io/v1beta1
@@ -658,8 +666,11 @@ resource "helm_release" "grafana_k8s_monitoring" {
     clusterMetrics = { enabled = true }
     nodeMetrics    = { enabled = true }
 
-    # Scrape application metrics from pods with prometheus annotations
-    # Pods need: prometheus.io/scrape: "true", prometheus.io/port: "8000", prometheus.io/path: "/metrics"
+    # Scrape application metrics from annotated pods. k8s-monitoring v2 matches
+    # the k8s.grafana.com/* annotations (not prometheus.io/*), e.g.
+    #   k8s.grafana.com/scrape: "true"
+    #   k8s.grafana.com/metrics.portNumber: "8000"
+    #   k8s.grafana.com/metrics.path: "/metrics"
     annotationAutodiscovery = {
       enabled    = true
       namespaces = ["missing-table", "qualityplaybook", "myrunstreak"]

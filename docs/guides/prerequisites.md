@@ -16,16 +16,15 @@ Complete list of required tools, accounts, and credentials needed to deploy this
 3. Create IAM user with programmatic access
 4. Save access key ID and secret access key
 
-### DigitalOcean Account
-- **Required for:** DOKS Kubernetes cluster
-- **Cost impact:** ~$48/month for 2-node cluster
-- **Setup:** [Create DigitalOcean account](https://www.digitalocean.com/)
-- **Referral credit:** Get $200 credit with referral links
+### Linode (Akamai) Account
+- **Required for:** LKE Kubernetes cluster (production, `clouds/linode/environments/dev`)
+- **Cost impact:** one g6-standard-2 node — check current Linode pricing
+- **Setup:** [Linode](https://www.linode.com/)
 
 **Post-signup steps:**
 1. Add payment method
-2. Generate API token (Settings → API → Generate New Token)
-3. Save token securely
+2. Create a personal access token for the API
+3. Save token securely (CI reads it as the `LINODE_TOKEN` GitHub secret)
 
 ### GitHub Account
 - **Required for:** Container registry (GHCR), CI/CD workflows
@@ -144,33 +143,16 @@ aws sts get-caller-identity
 
 ---
 
-### 4. doctl (DigitalOcean CLI)
+### 4. Cluster access (kubeconfig)
 
-**Version:** Latest
-**Purpose:** DigitalOcean command-line interface
+No cloud-specific CLI is required. The LKE kubeconfig is a sensitive output of
+the production stack:
 
-#### Installation
-
-**macOS (Homebrew):**
 ```bash
-brew install doctl
-```
-
-**Linux (Snap):**
-```bash
-snap install doctl
-```
-
-**Configure:**
-```bash
-doctl auth init
-# Enter your DigitalOcean API token when prompted
-```
-
-**Verify:**
-```bash
-doctl account get
-# Should show your account email and status
+cd clouds/linode/environments/dev
+tofu output -raw kubeconfig > ~/.kube/missingtable-lke.yaml
+export KUBECONFIG=~/.kube/missingtable-lke.yaml
+kubectl get nodes
 ```
 
 ---
@@ -255,10 +237,8 @@ Before starting deployment, gather these values:
 aws sts get-caller-identity --query Account --output text
 ```
 
-### DigitalOcean Credentials
-- [x] **DigitalOcean API Token** (format: `dop_v1_...`)
-
-**How to get:** Settings → API → Generate New Token
+### Linode Credentials
+- [x] **Linode API token** (exported as `LINODE_TOKEN`)
 
 ### GitHub Credentials
 - [x] **GitHub Username**
@@ -306,17 +286,12 @@ echo "=== Tool Versions ==="
 tofu version
 kubectl version --client --short
 aws --version
-doctl version
 docker --version
 gh --version 2>/dev/null || echo "gh CLI not installed (optional)"
 
 # Check AWS authentication
 echo -e "\n=== AWS Account ==="
 aws sts get-caller-identity
-
-# Check DigitalOcean authentication
-echo -e "\n=== DigitalOcean Account ==="
-doctl account get
 
 # Check Docker
 echo -e "\n=== Docker ==="
@@ -335,17 +310,15 @@ Run this script to verify everything is set up correctly.
 - Domain registration: $10-15/year
 
 ### Monthly Recurring Costs
-- **DOKS cluster:** $48/month (can be destroyed when not in use)
+- **LKE cluster:** one g6-standard-2 node (production — do not destroy)
 - **Route 53:** $1/month (2 hosted zones at $0.50 each)
 - **Lambda executions:** ~$0 (free tier covers daily certificate checks)
 - **S3 state storage:** ~$0 (minimal usage)
 - **Secrets Manager:** ~$0.40/month (2 secrets at $0.40/secret/month)
 
-**Total:** ~$49/month for production deployment
+**Total:** LKE node + ~$1/month
 
 ### Cost Optimization Tips
-- Destroy DOKS cluster when not actively using it
-- Use smaller DOKS node sizes for development (s-1vcpu-2gb)
 - Lambda and S3 stay within free tier for this workload
 - Route 53 cost is fixed but minimal
 
@@ -369,15 +342,6 @@ aws configure list
 
 # Reconfigure if needed
 aws configure
-```
-
-### doctl authentication fails
-```bash
-# Re-initialize auth
-doctl auth init --context default
-
-# List available contexts
-doctl auth list
 ```
 
 ### kubectl not found

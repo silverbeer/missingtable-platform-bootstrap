@@ -410,57 +410,12 @@ resource "kubernetes_namespace_v1" "myrunstreak" {
   depends_on = [linode_lke_cluster.main]
 }
 
-resource "kubectl_manifest" "myrunstreak_certificate" {
-  yaml_body = <<YAML
-apiVersion: cert-manager.io/v1
-kind: Certificate
-metadata:
-  name: myrunstreak-tls
-  namespace: myrunstreak
-spec:
-  secretName: myrunstreak-tls
-  issuerRef:
-    name: letsencrypt-prod
-    kind: ClusterIssuer
-  dnsNames:
-    - myrunstreak.run
-    - www.myrunstreak.run
-YAML
-
-  depends_on = [kubernetes_namespace_v1.myrunstreak, kubectl_manifest.letsencrypt_cluster_issuer]
-}
-
-resource "kubectl_manifest" "myrunstreak_app_external_secret" {
-  yaml_body = <<YAML
-apiVersion: external-secrets.io/v1beta1
-kind: ExternalSecret
-metadata:
-  name: myrunstreak-app-secrets
-  namespace: myrunstreak
-spec:
-  refreshInterval: 1h
-  secretStoreRef:
-    name: aws-secrets-manager
-    kind: ClusterSecretStore
-  target:
-    name: myrunstreak-secrets
-  data:
-    - secretKey: supabase-url
-      remoteRef:
-        key: myrunstreak-app-secrets
-        property: supabase_url
-    - secretKey: supabase-anon-key
-      remoteRef:
-        key: myrunstreak-app-secrets
-        property: supabase_anon_key
-    - secretKey: supabase-service-key
-      remoteRef:
-        key: myrunstreak-app-secrets
-        property: supabase_service_key
-YAML
-
-  depends_on = [kubectl_manifest.aws_secret_store, kubernetes_namespace_v1.myrunstreak]
-}
+# The myrunstreak TLS Certificate and app ExternalSecret are not managed here:
+# the myrunstreak Helm chart (ArgoCD app "myrunstreak", selfHeal on) owns them.
+# cert-manager generates the Certificate from the chart's Ingress, and the chart's
+# ExternalSecret carries more keys than this stack ever had. Both were removed
+# from this stack in SB-1719 to stop the two owners overwriting each other.
+# The namespace above and the ghcr pull secret below stay here.
 
 resource "kubectl_manifest" "myrunstreak_ghcr_external_secret" {
   yaml_body = <<YAML

@@ -626,9 +626,22 @@ resource "helm_release" "grafana_k8s_monitoring" {
     #   k8s.grafana.com/scrape: "true"
     #   k8s.grafana.com/metrics.portNumber: "8000"
     #   k8s.grafana.com/metrics.path: "/metrics"
+    # The chart's discovery rules attach no namespace or pod label, so every
+    # dashboard and alert filtering on namespace="missing-table" matched
+    # nothing (SB-1720). Map them from the pod metadata here.
     annotationAutodiscovery = {
-      enabled    = true
-      namespaces = ["missing-table", "qualityplaybook", "myrunstreak"]
+      enabled             = true
+      namespaces          = ["missing-table", "qualityplaybook", "myrunstreak"]
+      extraDiscoveryRules = <<-EOT
+        rule {
+          source_labels = ["__meta_kubernetes_namespace"]
+          target_label  = "namespace"
+        }
+        rule {
+          source_labels = ["__meta_kubernetes_pod_name"]
+          target_label  = "pod"
+        }
+      EOT
     }
 
     # Log collection - only from our app namespaces

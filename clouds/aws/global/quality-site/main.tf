@@ -64,28 +64,28 @@ resource "aws_s3_bucket_policy" "quality_site_policy" {
 }
 
 resource "aws_s3_bucket_lifecycle_configuration" "quality_site_lifecycle" {
-    bucket = aws_s3_bucket.quality_site.id
+  bucket = aws_s3_bucket.quality_site.id
 
-    rule {
-        id = "delete-old-runs"
-        status = "Enabled"
+  rule {
+    id     = "delete-old-runs"
+    status = "Enabled"
 
-        filter {
-            prefix = "runs/"        
-        }
-
-        expiration {
-            days = 30
-        }
+    filter {
+      prefix = "runs/"
     }
+
+    expiration {
+      days = 30
+    }
+  }
 }
 
 resource "aws_s3_object" "index_html" {
-    bucket       = aws_s3_bucket.quality_site.id
-    key          = "index.html"
-    content_type = "text/html"
+  bucket       = aws_s3_bucket.quality_site.id
+  key          = "index.html"
+  content_type = "text/html"
 
-    content = <<-EOF
+  content = <<-EOF
         <!DOCTYPE html>
         <html lang="en">
         <head>
@@ -107,6 +107,12 @@ resource "aws_s3_object" "index_html" {
         </body>
         </html>
     EOF
+
+  # Placeholder only. The quality workflows overwrite index.html (with
+  # cache_control) on every publish, so tofu must never push this back.
+  lifecycle {
+    ignore_changes = all
+  }
 }
 
 
@@ -155,6 +161,35 @@ resource "aws_acm_certificate_validation" "quality_site_cert_validation" {
 # CLOUDFRONT - CDN and HTTPS termination
 # =============================================================================
 
+# CloudFront Function to handle subdirectory index.html requests.
+# Without this, paths like /foo/bar/ return 403 instead of /foo/bar/index.html.
+# Applied 2026-01-05 from the unmerged feature/github-oidc-quality branch;
+# brought onto main in SB-1724 so an apply from main does not delete it.
+resource "aws_cloudfront_function" "index_rewrite" {
+  name    = "quality-site-index-rewrite"
+  runtime = "cloudfront-js-2.0"
+  publish = true
+  comment = "Rewrite directory paths to index.html"
+
+  code = <<-EOF
+    function handler(event) {
+      var request = event.request;
+      var uri = request.uri;
+
+      // If URI ends with '/', append index.html
+      if (uri.endsWith('/')) {
+        request.uri += 'index.html';
+      }
+      // If URI doesn't have an extension, assume it's a directory and add /index.html
+      else if (!uri.includes('.')) {
+        request.uri += '/index.html';
+      }
+
+      return request;
+    }
+  EOF
+}
+
 resource "aws_cloudfront_origin_access_control" "quality_site_cdn_oac" {
   name                              = "quality-site-oac"
   description                       = "OAC for quality.missingtable.com"
@@ -164,62 +199,67 @@ resource "aws_cloudfront_origin_access_control" "quality_site_cdn_oac" {
 }
 
 resource "aws_cloudfront_distribution" "quality_site_cdn" {
-    enabled             = true
-    is_ipv6_enabled     = true
-    default_root_object = "index.html"
-    aliases             = ["quality.missingtable.com"]
+  enabled             = true
+  is_ipv6_enabled     = true
+  default_root_object = "index.html"
+  aliases             = ["quality.missingtable.com"]
 
-    origin {
-        domain_name              = aws_s3_bucket.quality_site.bucket_regional_domain_name
-        origin_id                = "S3-quality-site"
-        origin_access_control_id = aws_cloudfront_origin_access_control.quality_site_cdn_oac.id
+  origin {
+    domain_name              = aws_s3_bucket.quality_site.bucket_regional_domain_name
+    origin_id                = "S3-quality-site"
+    origin_access_control_id = aws_cloudfront_origin_access_control.quality_site_cdn_oac.id
+  }
+
+  default_cache_behavior {
+    allowed_methods        = ["GET", "HEAD"]
+    cached_methods         = ["GET", "HEAD"]
+    target_origin_id       = "S3-quality-site"
+    viewer_protocol_policy = "redirect-to-https"
+
+    forwarded_values {
+      query_string = false
+      cookies {
+        forward = "none"
+      }
     }
 
-    default_cache_behavior {
-        allowed_methods        = ["GET", "HEAD"]
-        cached_methods         = ["GET", "HEAD"]
-        target_origin_id       = "S3-quality-site"
-        viewer_protocol_policy = "redirect-to-https"    
+    min_ttl     = 0
+    default_ttl = 3600
+    max_ttl     = 86400
 
-        forwarded_values {
-            query_string = false
-            cookies {
-                forward = "none"
-            }
-        }
-
-        min_ttl     = 0
-        default_ttl = 3600
-        max_ttl     = 86400
+    function_association {
+      event_type   = "viewer-request"
+      function_arn = aws_cloudfront_function.index_rewrite.arn
     }
+  }
 
-    viewer_certificate {
-        acm_certificate_arn      = aws_acm_certificate_validation.quality_site_cert_validation.certificate_arn
-        ssl_support_method       = "sni-only"
-        minimum_protocol_version = "TLSv1.2_2021"
+  viewer_certificate {
+    acm_certificate_arn      = aws_acm_certificate_validation.quality_site_cert_validation.certificate_arn
+    ssl_support_method       = "sni-only"
+    minimum_protocol_version = "TLSv1.2_2021"
+  }
+
+  restrictions {
+    geo_restriction {
+      restriction_type = "none"
     }
+  }
 
-    restrictions {
-        geo_restriction {
-            restriction_type = "none"
-        }
-    }
-
-    tags = merge(local.common_tags, {
-        name = "quality_site_cdn"
-    })
+  tags = merge(local.common_tags, {
+    name = "quality_site_cdn"
+  })
 }
 
 resource "aws_route53_record" "quality_site_dns" {
-    zone_id = data.aws_route53_zone.missingtable.zone_id
-    name    = "quality.missingtable.com"
-    type    = "A"
+  zone_id = data.aws_route53_zone.missingtable.zone_id
+  name    = "quality.missingtable.com"
+  type    = "A"
 
-    alias {
-        name                   = aws_cloudfront_distribution.quality_site_cdn.domain_name
-        zone_id                = aws_cloudfront_distribution.quality_site_cdn.hosted_zone_id
-        evaluate_target_health = false
-    }
+  alias {
+    name                   = aws_cloudfront_distribution.quality_site_cdn.domain_name
+    zone_id                = aws_cloudfront_distribution.quality_site_cdn.hosted_zone_id
+    evaluate_target_health = false
+  }
 }
 
 # =============================================================================
@@ -300,213 +340,5 @@ resource "aws_iam_role_policy" "github_actions_quality" {
         Resource = aws_cloudfront_distribution.quality_site_cdn.arn
       }
     ]
-  })
-}
-
-# =============================================================================
-# GITHUB RUNNER - EC2 instance for self-hosted Actions runner (DEPRECATED)
-# Cost: ~$15/mo when running. Use runner_enabled=false to destroy.
-# NOTE: Replaced by GitHub OIDC above. Keep for reference or remove.
-# =============================================================================
-resource "aws_vpc" "runner" {
-  cidr_block           = "10.100.0.0/16"
-  enable_dns_hostnames = true
-  enable_dns_support   = true
-
-  tags = merge(local.common_tags, {
-    name = "quality-site-runner-vpc"
-  })
-}
-
-resource "aws_internet_gateway" "runner" {
-  vpc_id = aws_vpc.runner.id
-
-  tags = merge(local.common_tags, {
-    name = "quality-site-runner-igw"
-  })
-}
-
-resource "aws_subnet" "runner" {
-  vpc_id                  = aws_vpc.runner.id
-  cidr_block              = "10.100.1.0/24"
-  availability_zone       = "${var.aws_region}a"
-  map_public_ip_on_launch = true
-
-  tags = merge(local.common_tags, {
-    name = "quality-site-runner-subnet"
-  })
-}
- 
-resource "aws_route_table" "runner" {
-  vpc_id = aws_vpc.runner.id
-
-  route {
-    cidr_block = "0.0.0.0/0"
-    gateway_id = aws_internet_gateway.runner.id
-  }
-
-  tags = merge(local.common_tags, {
-    name = "quality-site-runner-rt"
-  })
-}
-
-resource "aws_route_table_association" "runner" {
-  subnet_id      = aws_subnet.runner.id
-  route_table_id = aws_route_table.runner.id
-}
-
-resource "aws_security_group" "runner" {
-  name        = "quality-site-runner-sg"
-  description = "Security group for GitHub Actions runner"
-  vpc_id      = aws_vpc.runner.id
-
-  # Note: No inbound rule for GitHub. Runners make outbound connections to GitHub
-  # and poll for jobs. GitHub never connects inbound to your runner.
-  ingress {
-    description = "SSH from allowed IP"
-    from_port   = 22
-    to_port     = 22
-    protocol    = "tcp"
-    cidr_blocks = [var.allowed_ssh_cidr]
-  }
-
-  egress {
-    description = "Allow all outbound (required for runner to connect to GitHub)"
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  tags = merge(local.common_tags, {
-    name = "quality-site-runner-sg"
-  })
-}
-
-resource "aws_secretsmanager_secret" "runner_token" {
-  name        = "quality-site/github-runner-token"
-  description = "GitHub Actions runner registration token for missing-table repo"
-
-  tags = merge(local.common_tags, {
-    name = "quality-site-runner-token"
-  })
-}
-
-resource "aws_iam_role" "runner" {
-  name = "quality-site-runner-role"
-
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Action = "sts:AssumeRole"
-        Effect = "Allow"
-        Principal = {
-          Service = "ec2.amazonaws.com"
-        }
-      }
-    ]
-  })
-
-  tags = merge(local.common_tags, {
-    name = "quality-site-runner-role"
-  })
-}
-
-
-resource "aws_iam_role_policy" "runner" {
-  name = "quality-site-runner-policy"
-  role = aws_iam_role.runner.id
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Sid    = "S3WriteAccess"
-        Effect = "Allow"
-        Action = [
-          "s3:PutObject",
-          "s3:DeleteObject",
-          "s3:ListBucket"
-        ]
-        Resource = [
-          aws_s3_bucket.quality_site.arn,
-          "${aws_s3_bucket.quality_site.arn}/*"
-        ]
-      },
-      {
-        Sid    = "CloudFrontInvalidation"
-        Effect = "Allow"
-        Action = [
-          "cloudfront:CreateInvalidation"
-        ]
-        Resource = aws_cloudfront_distribution.quality_site_cdn.arn
-      },
-      {
-        Sid    = "SecretsManagerReadToken"
-        Effect = "Allow"
-        Action = [
-          "secretsmanager:GetSecretValue"
-        ]
-        Resource = aws_secretsmanager_secret.runner_token.arn
-      }
-    ]
-  })
-}
-
-resource "aws_iam_instance_profile" "runner" {
-  name = "quality-site-runner-profile"
-  role = aws_iam_role.runner.name
-
-  tags = merge(local.common_tags, {
-    name = "quality-site-runner-profile"
-  })
-}
-
-
-resource "aws_key_pair" "runner" {
-  key_name   = "quality-site-runner-key"
-  public_key = var.runner_ssh_public_key
-
-  tags = merge(local.common_tags, {
-    name = "quality-site-runner-key"
-  })
-}
-
-data "aws_ami" "ubuntu" {
-  most_recent = true
-  owners      = ["099720109477"] # Canonical
-
-  filter {
-    name   = "name"
-    values = ["ubuntu/images/hvm-ssd-gp3/ubuntu-noble-24.04-amd64-server-*"]
-  }
-
-  filter {
-    name   = "virtualization-type"
-    values = ["hvm"]
-  }
-}
-
-resource "aws_instance" "runner" {
-  count = var.runner_enabled ? 1 : 0
-
-  ami                         = data.aws_ami.ubuntu.id
-  instance_type               = "t3.small"
-  key_name                    = aws_key_pair.runner.key_name
-  vpc_security_group_ids      = [aws_security_group.runner.id]
-  subnet_id                   = aws_subnet.runner.id
-  iam_instance_profile        = aws_iam_instance_profile.runner.name
-  associate_public_ip_address = true
-
-  root_block_device {
-    volume_size = 30
-    volume_type = "gp3"
-    encrypted   = true
-  }
-
-  tags = merge(local.common_tags, {
-    name = "quality-site-runner"
-    role = "github-runner"
   })
 }

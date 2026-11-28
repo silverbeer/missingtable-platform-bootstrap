@@ -2,6 +2,10 @@
 # LKE CLUSTER
 # =============================================================================
 
+# WARNING: changing k8s_version makes the provider recycle EVERY node
+# (linode provider resource.go: HasChange("k8s_version") -> recycleLKECluster).
+# With count = 1 that is a full outage. Bump the pool to count = 2 in a separate
+# apply first, then change the version, then scale back. See decisions-log SB-1820.
 resource "linode_lke_cluster" "main" {
   label       = "missingtable-dev"
   k8s_version = "1.36"

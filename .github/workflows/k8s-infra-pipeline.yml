@@ -41,15 +41,18 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup OpenTofu
-        uses: opentofu/setup-opentofu@v1
+        uses: opentofu/setup-opentofu@v2
         with:
           tofu_version: 1.8.0
+          # Plain binary: the wrapper adds its own output handling, which we
+          # don't need now that the run step captures output itself.
+          tofu_wrapper: false
 
       - name: Configure AWS credentials via OIDC
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@v6
         with:
           role-to-assume: ${{ secrets.AWS_OIDC_ROLE_ARN }}
           aws-region: us-east-2
@@ -77,9 +80,40 @@ jobs:
         run: tofu init
 
       - name: Run OpenTofu command
+        shell: bash
+        env:
+          COMMAND: ${{ inputs.command }}
+          TARGET: ${{ inputs.cloud }}/${{ inputs.environment }}
         run: |
-          if [ "${{ inputs.command }}" = "plan" ]; then
-            tofu plan
+          set -o pipefail
+
+          if [ "$COMMAND" = "plan" ]; then
+            tofu plan -no-color -input=false -out=tfplan | tee plan.log
+            tofu show -no-color tfplan > plan.txt
+
+            # Summary page: headline count, then the full plan collapsed.
+            # Leading +/- are moved to column 0 so the diff block colours them.
+            # Exposure equals the (public) job log, which already prints the
+            # plan. Secrets must be declared `sensitive` so tofu redacts them;
+            # don't rely on runner masking reaching the summary.
+            {
+              echo "## tofu plan: \`$TARGET\`"
+              echo
+              grep -E '^(Plan:|No changes\.)' plan.log || echo "_No plan summary line found; see job log._"
+              echo
+              echo "<details open><summary>Full plan</summary>"
+              echo
+              echo '```diff'
+              sed -E 's/^( *)([-+]) /\2\1 /' plan.txt | head -c 900000
+              echo '```'
+              echo
+              echo "</details>"
+            } >> "$GITHUB_STEP_SUMMARY"
           else
-            tofu ${{ inputs.command }} -auto-approve
+            tofu "$COMMAND" -no-color -input=false -auto-approve | tee run.log
+            {
+              echo "## tofu $COMMAND: \`$TARGET\`"
+              echo
+              grep -E '(Apply|Destroy) complete!' run.log || echo "_No completion line found; see job log._"
+            } >> "$GITHUB_STEP_SUMMARY"
           fi

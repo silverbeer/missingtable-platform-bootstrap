@@ -565,3 +565,21 @@ applicationIds for FCM HTTP v1 push (backend side: SB-1463).
   Pub/Sub topic or monitoring channel, so the block is omitted (API default = emails).
 - ADC needs `user_project_override` + `billing_project` for the Firebase and Budgets APIs.
   The budget uses a `google.budget` provider alias billed to `missing-table`.
+
+## 2026-11-27 — LKE 1.35 → 1.36 upgrade (SB-1820)
+
+Linode deprecated LKE 1.35 (support ticket 27951718): no new 1.35 clusters, EOL and a
+forced auto-upgrade to 1.36 on 2027-02-28. We upgrade on our own schedule rather than
+take the forced one.
+
+- **Two steps, only one in tofu.** Bumping `k8s_version` upgrades the control plane in
+  place. Nodes keep the old kubelet until the pool is recycled (Cloud Manager or
+  `linode-cli lke pool-recycle`). Recycling replaces nodes and changes no IaC-managed state.
+- **Recycling a one-node pool causes downtime.** Every workload is single-replica on one
+  node. To avoid it, set `count = 2` for the recycle, then set it back to 1. The extra
+  g6-standard-2 runs for about an hour, so it costs cents.
+- **No data at risk.** App PVCs are Linode Block Storage (`linode-block-storage-retain`) and
+  reattach to the new node. hostPath is used only by the read-only Alloy log reader and
+  node-exporter.
+- **No 1.36 removals in use.** No gitRepo volumes and no Service `externalIPs`. The only
+  deprecated API being requested is core `v1/Endpoints`, which has no removal release.

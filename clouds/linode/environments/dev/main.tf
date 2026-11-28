@@ -4,7 +4,7 @@
 
 resource "linode_lke_cluster" "main" {
   label       = "missingtable-dev"
-  k8s_version = "1.35"
+  k8s_version = "1.36"
   region      = "us-east" # Newark, close to AWS us-east-2
   tags        = ["missing-table", "dev", "prod"]
 

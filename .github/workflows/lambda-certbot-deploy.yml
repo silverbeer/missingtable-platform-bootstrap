@@ -40,7 +40,8 @@ jobs:
       - name: Build Docker image
         working-directory: clouds/aws/global/certificate-management/lambda
         run: |
-          docker build -t certbot-lambda:latest .
+          # Lambda rejects OCI indexes with attestations, which current runner Docker adds by default.
+          docker build --platform linux/amd64 --provenance=false --sbom=false -t certbot-lambda:latest .
           docker tag certbot-lambda:latest ${{ steps.ecr-uri.outputs.ecr_uri }}:latest
           docker tag certbot-lambda:latest ${{ steps.ecr-uri.outputs.ecr_uri }}:${{ github.sha }}
 

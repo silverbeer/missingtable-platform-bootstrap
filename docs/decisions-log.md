@@ -583,3 +583,18 @@ take the forced one.
   node-exporter.
 - **No 1.36 removals in use.** No gitRepo volumes and no Service `externalIPs`. The only
   deprecated API being requested is core `v1/Endpoints`, which has no removal release.
+
+## 2026-11-28 — Ansible lab POC retired (SB-1829)
+
+The Ansible + FreeRADIUS learning lab (`clouds/aws/environments/ansible-lab/`) was a
+POC that has ended. Its AWS resources were already gone (instance, VPC, S3 bucket, IAM
+role, key pair and security group all NotFound), leaving only the code, the
+`ansible-lint` workflow and a stale state file. The lint workflow surfaced the dead
+code when it ran for the first time in months (11 violations, triggered by a workflow
+file edit in SB-1827).
+
+- Removed the stack and `.github/workflows/ansible-lint.yml`.
+- Deleted the state object `aws/environments/ansible-lab/terraform.tfstate`. The state
+  bucket is versioned, so the old version can still be recovered.
+- `docs/plans/quality-site-implementation.md` keeps its Ansible sections as a
+  historical record of the self-hosted runner (removed in SB-1724).

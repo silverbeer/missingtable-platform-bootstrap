@@ -1,6 +1,0 @@
-# FreeRADIUS users file - Managed by Ansible
-# Do not edit manually - changes will be overwritten
-
-{% for user in radius_users %}
-{{ user.name }} Cleartext-Password := "{{ user.password }}"
-{% endfor %} 

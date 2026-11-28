@@ -598,3 +598,27 @@ file edit in SB-1827).
   bucket is versioned, so the old version can still be recovered.
 - `docs/plans/quality-site-implementation.md` keeps its Ansible sections as a
   historical record of the self-hosted runner (removed in SB-1724).
+
+## 2026-11-28 — LKE 1.36 upgrade caused a ~6 min outage (SB-1820 follow-up)
+
+Applying the `k8s_version` bump (run #38) did more than upgrade the control plane.
+Linode provider v2.41.2 also **recycles every node** whenever `k8s_version` changes
+(`resource.go`: `HasChange("k8s_version")` calls `recycleLKECluster`). Neither the plan
+nor the resource docs show this. With `count = 1`, the single node was drained and
+deleted before its replacement existed.
+
+- **Timeline:** drain at about 08:58, new node Ready 09:00:52, site 200 at 09:03:56, all
+  pods Ready at 09:07:32. Data was intact: the Redis PVCs reattached, ExternalSecrets
+  synced and certificates were valid.
+- **The run failed but the upgrade completed.** The provider tracks the recycle through
+  the Events API. `LINODE_TOKEN` has no events scope, so it got `[401] Your OAuth token
+  is not authorized to use this endpoint`. The update and recycle had already been sent,
+  so Linode finished them anyway. A follow-up plan showed `No changes`.
+- **Runbook for the next version bump:**
+  1. Separate apply: pool `count = 2`, then wait until both nodes are Ready.
+  2. Bump `k8s_version` and apply. LKE recycles the nodes one at a time while workloads move.
+  3. Separate apply: `count = 1`.
+- **Token:** reissue `LINODE_TOKEN` with Events read-only added, otherwise the apply
+  fails partway through the recycle.
+- **Lesson:** a one-line plan diff on a managed resource can hide disruptive provider
+  behaviour. Read the provider's update path before calling an apply non-disruptive.
